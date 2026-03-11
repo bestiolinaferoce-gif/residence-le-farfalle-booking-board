@@ -1,15 +1,15 @@
 :root {
   color-scheme: light;
-  --bg: #f5f3ef;
+  --bg: #f5f3ff;
   --panel: #ffffff;
   --text: #111827;
   --muted: #6b7280;
-  --line: #e5e7eb;
-  --accent: #1d4ed8;
-  --accent-faint: rgba(29, 78, 216, 0.07);
-  --zebra: rgba(0, 0, 0, 0.025);
-  --today-bg: rgba(29, 78, 216, 0.06);
-  --today-border: rgba(29, 78, 216, 0.25);
+  --line: #e9e3f5;
+  --accent: #7c3aed;
+  --accent-faint: rgba(124, 58, 237, 0.07);
+  --zebra: rgba(124, 58, 237, 0.025);
+  --today-bg: rgba(124, 58, 237, 0.06);
+  --today-border: rgba(124, 58, 237, 0.25);
 }
 
 * {
@@ -21,7 +21,7 @@ body {
   margin: 0;
   padding: 0;
   min-height: 100vh;
-  background: linear-gradient(160deg, #f5f3ef 0%, #ede9e2 100%);
+  background: linear-gradient(160deg, #f5f3ff 0%, #ede8f7 100%);
   color: var(--text);
   font-family: "Avenir Next", "Segoe UI", -apple-system, sans-serif;
 }
@@ -65,6 +65,12 @@ textarea {
 .header-logo {
   flex-shrink: 0;
   object-fit: contain;
+}
+
+.header-icon {
+  font-size: 1.4rem;
+  line-height: 1;
+  flex-shrink: 0;
 }
 
 .title-row h1 {
@@ -484,6 +490,12 @@ textarea {
 .auth-logo {
   margin: 0 auto;
   object-fit: contain;
+}
+
+.auth-icon {
+  font-size: 3rem;
+  line-height: 1;
+  text-align: center;
 }
 
 .auth-titles h1 {

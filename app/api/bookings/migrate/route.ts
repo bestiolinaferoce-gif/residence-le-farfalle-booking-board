@@ -3,7 +3,7 @@ import type { Booking } from '@/lib/types';
 
 const BASE = process.env.KV_REST_API_URL ?? '';
 const TOKEN = process.env.KV_REST_API_TOKEN ?? '';
-const KEY = 'vob_bookings';
+const KEY = 'lfb_bookings';
 
 type KVPayload = { v: number; ts: string; data: Booking[] };
 

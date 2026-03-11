@@ -1,7 +1,6 @@
 "use client";
 
 import { addDays, endOfMonth, format, getMonth, getYear, isBefore, parseISO, startOfMonth } from "date-fns";
-import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { GanttBoard } from "@/components/GanttBoard";
 import { BookingDialog } from "@/components/BookingDialog";
@@ -154,7 +153,7 @@ export default function Home() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `villa-olimpia-booking-board-${format(monthDate, "yyyy-MM")}.json`;
+    a.download = `le-farfalle-booking-board-${format(monthDate, "yyyy-MM")}.json`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -237,18 +236,18 @@ export default function Home() {
 
   useEffect(() => {
     const MONTH_ACCENTS: Record<number, string> = {
-      0: "#0c4a6e",
-      1: "#6b21a8",
-      2: "#166534",
-      3: "#0d9488",
-      4: "#4d7c0f",
-      5: "#b45309",
-      6: "#c2410c",
-      7: "#9f1239",
-      8: "#9d174d",
-      9: "#3730a3",
-      10: "#475569",
-      11: "#1d4ed8",
+      0: "#4c1d95",
+      1: "#5b21b6",
+      2: "#6d28d9",
+      3: "#7c3aed",
+      4: "#8b5cf6",
+      5: "#a78bfa",
+      6: "#7c3aed",
+      7: "#6d28d9",
+      8: "#5b21b6",
+      9: "#4c1d95",
+      10: "#6d28d9",
+      11: "#7c3aed",
     };
     const accent = monthTheme ? (MONTH_ACCENTS[getMonth(monthDate)] ?? "#1d4ed8") : "#1d4ed8";
     const r = parseInt(accent.slice(1, 3), 16);
@@ -299,9 +298,8 @@ export default function Home() {
       />
 
       <section className="print-title">
-        <Image src="/logo-villa-olimpia.png" alt="" width={36} height={36} className="print-logo" />
         <div>
-          <h2>Villa Olimpia — Booking Board</h2>
+          <h2>Residence Le Farfalle — Booking Board</h2>
           <p>{format(monthDate, "MMMM yyyy")}</p>
         </div>
       </section>

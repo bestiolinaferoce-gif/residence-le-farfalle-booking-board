@@ -12,9 +12,9 @@ import {
 } from "date-fns";
 import type { Booking, BookingFilters } from "@/lib/types";
 
-export const STORAGE_KEY = "villa-olimpia-booking-board:v1";
-export const BACKUP_KEY = "villa-olimpia-booking-board:backups:v1";
-export const SETTINGS_KEY = "villa-olimpia-booking-board:settings:v1";
+export const STORAGE_KEY = "le-farfalle-booking-board:v1";
+export const BACKUP_KEY = "le-farfalle-booking-board:backups:v1";
+export const SETTINGS_KEY = "le-farfalle-booking-board:settings:v1";
 
 export const statusColors: Record<Booking["status"], string> = {
   confirmed: "#16a34a",
@@ -48,15 +48,11 @@ export const statusBadge: Record<Booking["status"], BadgeStyle> = {
 };
 
 export const LODGE_COLORS_MAP: Record<string, string> = {
-  Frangipane: "#8b5cf6",
-  Fiordaliso: "#3b82f6",
-  Giglio: "#10b981",
-  Tulipano: "#f43f5e",
-  Orchidea: "#ec4899",
-  Lavanda: "#a78bfa",
-  Geranio: "#f97316",
-  Gardenia: "#14b8a6",
-  Azalea: "#e11d48",
+  "Camera 1": "#8b5cf6",
+  "Camera 2": "#a855f7",
+  "Camera 3": "#c084fc",
+  "Camera 4": "#7c3aed",
+  "Camera 5": "#6d28d9",
 };
 
 export const channelBadge: Record<Booking["channel"], BadgeStyle> = {

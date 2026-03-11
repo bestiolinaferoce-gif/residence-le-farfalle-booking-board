@@ -37,15 +37,11 @@ function barColors(channel: string, status: string): { bg: string; text: string 
 }
 
 const LODGE_COLORS: Record<Lodge, { dot: string }> = {
-  Frangipane: { dot: "#8b5cf6" },
-  Fiordaliso: { dot: "#3b82f6" },
-  Giglio: { dot: "#10b981" },
-  Tulipano: { dot: "#f43f5e" },
-  Orchidea: { dot: "#ec4899" },
-  Lavanda: { dot: "#a78bfa" },
-  Geranio: { dot: "#f97316" },
-  Gardenia: { dot: "#14b8a6" },
-  Azalea: { dot: "#e11d48" },
+  "Camera 1": { dot: "#8b5cf6" },
+  "Camera 2": { dot: "#a855f7" },
+  "Camera 3": { dot: "#c084fc" },
+  "Camera 4": { dot: "#7c3aed" },
+  "Camera 5": { dot: "#6d28d9" },
 };
 
 type CellInfo = { booking: Booking; isFirst: boolean; span: number };

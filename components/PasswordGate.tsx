@@ -1,9 +1,8 @@
 "use client";
 
-import Image from "next/image";
 import { useEffect, useState } from "react";
 
-const SESSION_KEY = "villa-olimpia:auth";
+const SESSION_KEY = "le-farfalle:auth";
 
 export function PasswordGate({ children }: { children: React.ReactNode }) {
   const [unlocked, setUnlocked] = useState(false);
@@ -19,7 +18,7 @@ export function PasswordGate({ children }: { children: React.ReactNode }) {
   if (unlocked) return <>{children}</>;
 
   function submit() {
-    const password = process.env.NEXT_PUBLIC_APP_PASSWORD ?? "caccapanna73";
+    const password = process.env.NEXT_PUBLIC_APP_PASSWORD ?? "farfalle2024";
     if (value === password) {
       sessionStorage.setItem(SESSION_KEY, "1");
       setUnlocked(true);
@@ -32,9 +31,9 @@ export function PasswordGate({ children }: { children: React.ReactNode }) {
   return (
     <div className="auth-gate">
       <div className="auth-card">
-        <Image src="/logo-villa-olimpia.png" alt="Villa Olimpia" width={72} height={72} className="auth-logo" />
+        <div className="auth-icon">🦋</div>
         <div className="auth-titles">
-          <h1>Villa Olimpia</h1>
+          <h1>Residence Le Farfalle</h1>
           <p>Booking Board</p>
         </div>
         <form

@@ -3,7 +3,7 @@ import type { Booking } from '@/lib/types';
 
 const BASE = process.env.KV_REST_API_URL ?? '';
 const TOKEN = process.env.KV_REST_API_TOKEN ?? '';
-const KEY = 'vob_bookings';
+const KEY = 'lfb_bookings';
 
 function toIcalDate(iso: string): string {
   return iso.slice(0, 10).replace(/-/g, '');
@@ -71,13 +71,13 @@ export async function GET(req: NextRequest) {
       : '';
     const lines = [
       'BEGIN:VEVENT',
-      foldLine(`UID:${b.id}@villa-olimpia`),
+      foldLine(`UID:${b.id}@le-farfalle`),
       `DTSTAMP:${now}`,
       `DTSTART;VALUE=DATE:${toIcalDate(b.checkIn)}`,
       `DTEND;VALUE=DATE:${toIcalDate(b.checkOut)}`,
       foldLine(`SUMMARY:${escapeIcal(b.guestName)} — ${escapeIcal(b.lodge)}`),
       foldLine(`DESCRIPTION:${escapeIcal(desc)}`),
-      foldLine(`LOCATION:Villa Olimpia — ${escapeIcal(b.lodge)}`),
+      foldLine(`LOCATION:Residence Le Farfalle — ${escapeIcal(b.lodge)}`),
       `STATUS:${status}`,
       ...(lastMod ? [`LAST-MODIFIED:${lastMod}`] : []),
       'END:VEVENT',
@@ -88,12 +88,12 @@ export async function GET(req: NextRequest) {
   const cal = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//Villa Olimpia//Booking Board//IT',
+    'PRODID:-//Residence Le Farfalle//Booking Board//IT',
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
-    foldLine('X-WR-CALNAME:Villa Olimpia — Booking Board'),
+    foldLine('X-WR-CALNAME:Residence Le Farfalle — Booking Board'),
     'X-WR-TIMEZONE:Europe/Rome',
-    'X-WR-CALDESC:Prenotazioni Villa Olimpia',
+    'X-WR-CALDESC:Prenotazioni Residence Le Farfalle',
     ...events,
     'END:VCALENDAR',
   ].join('\r\n');
@@ -101,7 +101,7 @@ export async function GET(req: NextRequest) {
   return new NextResponse(cal, {
     headers: {
       'Content-Type': 'text/calendar; charset=utf-8',
-      'Content-Disposition': 'attachment; filename="villa-olimpia.ics"',
+      'Content-Disposition': 'attachment; filename="le-farfalle.ics"',
       'Cache-Control': 'no-store',
     },
   });

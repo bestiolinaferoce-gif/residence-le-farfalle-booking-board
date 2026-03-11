@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { Calendar, CloudUpload, Download, Mail, Plus, Printer, Upload } from "lucide-react";
 import { format } from "date-fns";
 import { FilterBar } from "@/components/FilterBar";
@@ -76,14 +75,8 @@ export function Toolbar({
     <section className="toolbar no-print">
       <div className="title-row">
         <div className="header-brand">
-          <Image
-            src="/logo-villa-olimpia.png"
-            alt="Villa Olimpia"
-            width={28}
-            height={28}
-            className="header-logo"
-          />
-          <h1>Villa Olimpia — Booking Board</h1>
+          <span className="header-icon">🦋</span>
+          <h1>Residence Le Farfalle — Booking Board</h1>
         </div>
         <span>{format(monthDate, "MMMM yyyy")}</span>
       </div>

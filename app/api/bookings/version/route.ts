@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 
 const BASE = process.env.KV_REST_API_URL ?? '';
 const TOKEN = process.env.KV_REST_API_TOKEN ?? '';
-const KEY = 'vob_bookings';
+const KEY = 'lfb_bookings';
 
 export async function GET() {
   if (!BASE || !TOKEN) return NextResponse.json({ v: 0, ts: '' });
