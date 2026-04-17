@@ -1,6 +1,6 @@
 "use client";
 
-import { Calendar, CloudUpload, Download, Mail, Plus, Printer, Upload } from "lucide-react";
+import { Calendar, CloudUpload, Download, FileText, Mail, Plus, Printer, Upload } from "lucide-react";
 import { format } from "date-fns";
 import { FilterBar } from "@/components/FilterBar";
 import { MonthNavigation } from "@/components/MonthNavigation";
@@ -198,12 +198,12 @@ export function Toolbar({
           </button>
           <button
             type="button"
-            className={syncError ? "ghost-btn danger-btn" : "ghost-btn"}
-            title={syncError ? "Sync offline — clicca per ritentare" : "Forza caricamento dati sul cloud"}
+            className="ghost-btn"
+            title={syncError ? "Cloud non raggiungibile — dati salvati in locale, clicca per ritentare" : "Forza caricamento dati sul cloud"}
             onClick={onForceSync}
           >
             <CloudUpload size={15} />
-            {syncError ? "Sync ⚠" : "Sync"}
+            Sync
           </button>
           {onSyncLocal && (
             <button
@@ -228,16 +228,20 @@ export function Toolbar({
           )}
           {syncError && (
             <span
-              className="sync-error"
-              title="Sincronizzazione fallita — dati mostrati potrebbero non essere aggiornati"
+              className="sync-local-badge"
+              title="Cloud non raggiungibile — dati salvati in locale. L'app funziona normalmente."
             >
-              ⚠ Offline
+              💾 Locale
             </span>
           )}
           <button type="button" className="ghost-btn" onClick={() => window.print()}>
             <Printer size={15} />
             Stampa
           </button>
+          <a href="/preventivi" className="ghost-btn" style={{ display: "inline-flex", alignItems: "center", gap: 6, textDecoration: "none" }}>
+            <FileText size={15} />
+            Preventivi
+          </a>
         </div>
       </div>
 

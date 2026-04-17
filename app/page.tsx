@@ -393,8 +393,8 @@ export default function Home() {
       />
 
       {syncError && (
-        <div className="sync-error-badge" role="status">
-          ⚠ Sincronizzazione offline
+        <div className="sync-local-banner" role="status">
+          💾 Solo locale — cloud non raggiungibile. Dati salvati localmente, nessuna perdita.
         </div>
       )}
       <Toast />

@@ -824,6 +824,40 @@ textarea {
   box-shadow: 0 2px 8px rgba(0,0,0,0.12);
 }
 
+/* Badge "Solo locale" — neutral grey, non-alarm */
+.sync-local-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: #f1f5f9;
+  color: #64748b;
+  border: 1px solid #cbd5e1;
+}
+.dark .sync-local-badge {
+  background: #1e293b;
+  color: #94a3b8;
+  border-color: #334155;
+}
+
+/* Banner "Solo locale" — bottom of page */
+.sync-local-banner {
+  text-align: center;
+  font-size: 12px;
+  color: #64748b;
+  padding: 8px 16px;
+  background: #f8fafc;
+  border-top: 1px solid #e2e8f0;
+}
+.dark .sync-local-banner {
+  background: #0f172a;
+  color: #94a3b8;
+  border-color: #1e293b;
+}
+
 @media print {
   .kpi-panel, .sync-error-badge { display: none; }
 }

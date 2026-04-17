@@ -6,28 +6,37 @@
  */
 
 export const PROPERTY_NAME = "Residence Le Farfalle";
-export const PROPERTY_LOCATION = "Le Farfalle";
+export const PROPERTY_LOCATION = "Capo Rizzuto";
+export const PROPERTY_EMAIL = "lefarfallecaporizzuto@gmail.com";
+export const PROPERTY_PHONE = "+39 3500979130";
 
 /**
  * Prezzi di riferimento per notte (€).
  * Usati come valore predefinito nel form prenotazione.
- * Modifica liberamente in base alla stagione o accordi.
  */
 export const LODGE_BASE_PRICES: Record<string, number> = {
-  "Camera 1": 100,
-  "Camera 2": 100,
-  "Camera 3": 100,
-  "Camera 4": 100,
-  "Camera 5": 100,
+  Limone: 100,
+  Macaone: 100,
+  Vanessa: 100,
+  Aurora: 100,
 };
 
 /**
- * Descrizione breve delle tipologie (opzionale — per uso futuro).
+ * Tipologia camere (B&B con colazione inclusa).
  */
 export const LODGE_TYPE: Record<string, string> = {
-  "Camera 1": "Camera doppia",
-  "Camera 2": "Camera doppia",
-  "Camera 3": "Camera doppia",
-  "Camera 4": "Camera doppia",
-  "Camera 5": "Camera doppia",
+  Limone: "Camera doppia B&B",
+  Macaone: "Camera doppia B&B",
+  Vanessa: "Camera doppia B&B",
+  Aurora: "Camera doppia B&B",
+};
+
+/**
+ * Descrizione camere.
+ */
+export const LODGE_DESCRIPTION: Record<string, string> = {
+  Limone: "2 posti letto, bagno privato",
+  Macaone: "2 posti letto, bagno privato",
+  Vanessa: "2 posti letto, bagno privato",
+  Aurora: "2 posti letto, bagno privato",
 };

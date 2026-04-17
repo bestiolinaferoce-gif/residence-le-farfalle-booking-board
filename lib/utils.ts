@@ -15,6 +15,7 @@ import type { Booking, BookingFilters } from "@/lib/types";
 export const STORAGE_KEY = "le-farfalle-booking-board:v1";
 export const BACKUP_KEY = "le-farfalle-booking-board:backups:v1";
 export const SETTINGS_KEY = "le-farfalle-booking-board:settings:v1";
+export const DELETED_KEY = "le-farfalle-booking-board:deleted:v1";
 
 export const statusColors: Record<Booking["status"], string> = {
   confirmed: "#16a34a",
@@ -48,11 +49,10 @@ export const statusBadge: Record<Booking["status"], BadgeStyle> = {
 };
 
 export const LODGE_COLORS_MAP: Record<string, string> = {
-  "Camera 1": "#8b5cf6",
-  "Camera 2": "#a855f7",
-  "Camera 3": "#c084fc",
-  "Camera 4": "#7c3aed",
-  "Camera 5": "#6d28d9",
+  Limone: "#7c3aed",
+  Macaone: "#a855f7",
+  Vanessa: "#c084fc",
+  Aurora: "#6d28d9",
 };
 
 export const channelBadge: Record<Booking["channel"], BadgeStyle> = {

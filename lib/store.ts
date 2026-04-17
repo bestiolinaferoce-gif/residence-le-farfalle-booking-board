@@ -276,44 +276,44 @@ export const useBookingStore = create<BookingState>((set, get) => {
 
   function persist(bookings: Booking[]): void {
     if (typeof window === "undefined") return;
+    // Write localStorage immediately — guarantees data is safe before any async op
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(bookings));
+    const currentBackups = readBackupSnapshotsFromLocal();
+    window.localStorage.setItem(
+      BACKUP_KEY,
+      JSON.stringify([{ createdAt: new Date().toISOString(), bookings }, ...currentBackups].slice(0, 10))
+    );
+    // Debounce KV sync — non-blocking, syncError only reflects cloud state
     if (persistTimer !== null) clearTimeout(persistTimer);
     persistTimer = setTimeout(() => {
       persistTimer = null;
-      const write = () => {
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(bookings));
-        fetch("/api/bookings", {
-          method: "POST",
-          headers: internalPostBookingsHeaders(),
-          body: JSON.stringify({ bookings }),
-        })
-          .then(async (r) => {
-            if (!r.ok) {
+      fetch("/api/bookings", {
+        method: "POST",
+        headers: internalPostBookingsHeaders(),
+        body: JSON.stringify({ bookings }),
+      })
+        .then(async (r) => {
+          if (!r.ok) {
+            set({ syncError: true });
+            return;
+          }
+          try {
+            const res = (await r.json()) as { ok?: boolean; v?: number };
+            if (res.ok === false) {
               set({ syncError: true });
               return;
             }
-            try {
-              const res = (await r.json()) as { ok?: boolean; v?: number };
-              if (res.ok === false) {
-                set({ syncError: true });
-                return;
-              }
-              if (typeof res.v === "number") {
-                set({ syncError: false, serverVersion: res.v });
-                persistSettings({ serverVersion: res.v });
-              } else {
-                set({ syncError: false });
-              }
-            } catch {
-              set({ syncError: true });
+            if (typeof res.v === "number") {
+              set({ syncError: false, serverVersion: res.v });
+              persistSettings({ serverVersion: res.v });
+            } else {
+              set({ syncError: false });
             }
-          })
-          .catch(() => set({ syncError: true }));
-        const current = readBackupSnapshotsFromLocal();
-        const merged = [{ createdAt: new Date().toISOString(), bookings }, ...current].slice(0, 10);
-        window.localStorage.setItem(BACKUP_KEY, JSON.stringify(merged));
-      };
-      if (typeof requestIdleCallback !== "undefined") requestIdleCallback(write);
-      else write();
+          } catch {
+            set({ syncError: true });
+          }
+        })
+        .catch(() => set({ syncError: true }));
     }, 250);
   }
 
@@ -565,7 +565,7 @@ export const useBookingStore = create<BookingState>((set, get) => {
           pushSkip("—", "—", `Record non valido (${rowLabel}).`);
           continue;
         }
-        const item = raw as Partial<Booking> & { source?: string; grossEarnings?: number };
+        const item = raw as Partial<Booking> & { source?: string; grossEarnings?: number; room?: string; deposit?: number; adults?: number };
         const idRaw = item.id != null ? String(item.id).trim() : "";
         if (!idRaw) {
           pushSkip("—", String(item.guestName ?? "").trim() || "—", `Manca id (${rowLabel}).`);
@@ -577,7 +577,11 @@ export const useBookingStore = create<BookingState>((set, get) => {
           continue;
         }
 
-        const guestsCount = typeof item.guestsCount === "number" && item.guestsCount >= 1 ? item.guestsCount : 2;
+        // Field aliases: support alternate field names from external exports
+        const lodgeRaw = item.lodge ?? item.room;
+        const guestsCount =
+          typeof item.guestsCount === "number" && item.guestsCount >= 1 ? item.guestsCount :
+          typeof item.adults === "number" && item.adults >= 1 ? item.adults : 2;
         const { channel, status } = channelAndStatusFromImport(item);
         const updatedAt =
           typeof item.updatedAt === "string" && item.updatedAt.trim()
@@ -589,13 +593,14 @@ export const useBookingStore = create<BookingState>((set, get) => {
         normalized.push({
           ...item,
           id: idRaw,
+          lodge: lodgeRaw as Lodge,
           channel,
           status,
           guestName: guestRaw,
           notes: String(item.notes ?? ""),
           guestsCount,
-          totalAmount: Number(item.totalAmount ?? (item as { grossEarnings?: number }).grossEarnings ?? 0),
-          depositAmount: Number(item.depositAmount ?? 0),
+          totalAmount: Number(item.totalAmount ?? item.grossEarnings ?? 0),
+          depositAmount: Number(item.depositAmount ?? item.deposit ?? 0),
           depositReceived: Boolean(item.depositReceived),
           createdAt: item.createdAt || new Date().toISOString(),
           updatedAt,

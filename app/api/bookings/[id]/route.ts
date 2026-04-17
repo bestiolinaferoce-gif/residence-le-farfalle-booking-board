@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { bookingWriteAuthError, kvNotConfiguredResponse } from '@/lib/bookingsApiAuth';
 import type { Booking } from '@/lib/types';
 
 const BASE = process.env.KV_REST_API_URL ?? '';
@@ -32,7 +33,9 @@ export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  if (!BASE || !TOKEN) return NextResponse.json({ ok: false }, { status: 503 });
+  const authErr = bookingWriteAuthError(req);
+  if (authErr) return authErr;
+  if (!BASE || !TOKEN) return kvNotConfiguredResponse();
   try {
     const { id } = await params;
     const updates = (await req.json()) as Partial<Booking>;
@@ -60,10 +63,12 @@ export async function PUT(
 }
 
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  if (!BASE || !TOKEN) return NextResponse.json({ ok: false }, { status: 503 });
+  const authErr = bookingWriteAuthError(req);
+  if (authErr) return authErr;
+  if (!BASE || !TOKEN) return kvNotConfiguredResponse();
   try {
     const { id } = await params;
     const current = await readKV();
