@@ -32,9 +32,13 @@ function buildDefault(lodge?: Lodge, day?: string): FormState {
     channel: "direct",
     notes: "",
     guestsCount: 2,
+    childrenCount: 0,
     totalAmount: 0,
     depositAmount: 0,
     depositReceived: false,
+    checkInTime: "14:00",
+    checkOutTime: "10:00",
+    breakfastIncluded: true,
   };
 }
 
@@ -80,10 +84,14 @@ export function BookingDialog({
         channel: booking.channel,
         notes: booking.notes,
         guestsCount: booking.guestsCount,
+        childrenCount: booking.childrenCount ?? 0,
         totalAmount: booking.totalAmount,
         depositAmount: booking.depositAmount,
         depositReceived: booking.depositReceived,
         guestProfile: booking.guestProfile,
+        checkInTime: booking.checkInTime ?? "14:00",
+        checkOutTime: booking.checkOutTime ?? "10:00",
+        breakfastIncluded: booking.breakfastIncluded ?? true,
       });
       setError("");
       setFieldErrors({});
@@ -232,14 +240,22 @@ export function BookingDialog({
                   </select>
                 </label>
                 <label>
-                  N. ospiti
+                  N. adulti
                   <input type="number" min={1} value={form.guestsCount} onChange={(e) => change("guestsCount", Math.max(1, parseInt(e.target.value || "1", 10)))} />
                   {fieldErrors.guestsCount && <span className="field-error">{fieldErrors.guestsCount}</span>}
+                </label>
+                <label>
+                  N. bambini
+                  <input type="number" min={0} value={form.childrenCount ?? 0} onChange={(e) => change("childrenCount", Math.max(0, parseInt(e.target.value || "0", 10)))} />
                 </label>
                 <label>Canale
                   <select value={form.channel} onChange={(e) => change("channel", e.target.value as BookingInput["channel"])}>
                     {BOOKING_CHANNELS.map((c) => <option key={c} value={c}>{c}</option>)}
                   </select>
+                </label>
+                <label className="checkbox-line">
+                  <input type="checkbox" checked={form.breakfastIncluded ?? true} onChange={(e) => change("breakfastIncluded", e.target.checked)} />
+                  Colazione inclusa
                 </label>
               </div>
             </div>
@@ -258,6 +274,12 @@ export function BookingDialog({
                   <select value={form.status} onChange={(e) => change("status", e.target.value as BookingStatus)}>
                     {BOOKING_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
                   </select>
+                </label>
+                <label>Orario check-in
+                  <input type="time" value={form.checkInTime ?? "14:00"} onChange={(e) => change("checkInTime", e.target.value)} />
+                </label>
+                <label>Orario check-out
+                  <input type="time" value={form.checkOutTime ?? "10:00"} onChange={(e) => change("checkOutTime", e.target.value)} />
                 </label>
               </div>
             </div>

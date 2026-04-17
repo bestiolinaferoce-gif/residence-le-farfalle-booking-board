@@ -5,18 +5,27 @@ import { format } from "date-fns";
 import { FilterBar } from "@/components/FilterBar";
 import { MonthNavigation } from "@/components/MonthNavigation";
 import { SummaryBar } from "@/components/SummaryBar";
+import { LiveClock } from "@/components/LiveClock";
+import { WeatherWidget } from "@/components/WeatherWidget";
 import type { BookingFilters } from "@/lib/types";
 
+const ACCENT_PRESETS = [
+  "#7c3aed", // viola (default)
+  "#2563eb", // blu
+  "#0d9488", // teal
+  "#16a34a", // verde
+  "#d97706", // ambra
+  "#dc2626", // rosso
+  "#db2777", // rosa
+];
+
 type ToolbarProps = {
-  // title row
   monthDate: Date;
-  // month navigation
   yearOptions: number[];
   onPrev: () => void;
   onNext: () => void;
   onSetMonth: (month: Date) => void;
   onToday: () => void;
-  // filter bar
   filters: BookingFilters;
   monthTheme: boolean;
   onSearch: (v: string) => void;
@@ -24,7 +33,6 @@ type ToolbarProps = {
   onChannelFilter: (v: BookingFilters["channel"]) => void;
   onShowCancelled: (v: boolean) => void;
   onMonthTheme: (v: boolean) => void;
-  // action buttons
   onNewBooking: () => void;
   onEmailImport: () => void;
   onImportClick: () => void;
@@ -36,10 +44,13 @@ type ToolbarProps = {
   hasNewBookings?: boolean;
   onClearNotification?: () => void;
   newBookingsCount?: number;
-  // summary bar
   visibleCount: number;
   visibleTotal: number;
   visibleDeposits: number;
+  darkMode: boolean;
+  onToggleDarkMode: () => void;
+  accentColor: string;
+  onSetAccentColor: (c: string) => void;
 };
 
 export function Toolbar({
@@ -70,15 +81,75 @@ export function Toolbar({
   visibleTotal,
   visibleDeposits,
   newBookingsCount = 0,
+  darkMode,
+  onToggleDarkMode,
+  accentColor,
+  onSetAccentColor,
 }: ToolbarProps) {
+  function handleLogout() {
+    sessionStorage.removeItem("le-farfalle:auth");
+    window.location.reload();
+  }
+
   return (
     <section className="toolbar no-print">
-      <div className="title-row">
+      {/* Top row: brand + meta */}
+      <div className="header-top">
         <div className="header-brand">
           <span className="header-icon">🦋</span>
           <h1>Residence Le Farfalle — Booking Board</h1>
         </div>
-        <span>{format(monthDate, "MMMM yyyy")}</span>
+        <div className="header-right">
+          <WeatherWidget />
+          <LiveClock />
+          <div className="accent-picker" title="Colore accento">
+            {ACCENT_PRESETS.map((c) => (
+              <button
+                key={c}
+                type="button"
+                className={`accent-swatch${accentColor === c ? " active" : ""}`}
+                style={{ background: c }}
+                title={c}
+                onClick={() => onSetAccentColor(c)}
+              />
+            ))}
+          </div>
+          <button
+            type="button"
+            className="dark-toggle-btn"
+            title={darkMode ? "Passa a tema chiaro" : "Passa a tema scuro"}
+            onClick={onToggleDarkMode}
+          >
+            {darkMode ? "☀️" : "🌙"}
+          </button>
+          <a
+            href="https://www.residencelefarfalle.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="header-site-link"
+          >
+            → residencelefarfalle.com
+          </a>
+          <button type="button" className="header-logout-btn" onClick={handleLogout}>
+            Logout
+          </button>
+        </div>
+      </div>
+
+      {/* Month display badge */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <span style={{
+          color: "var(--muted)",
+          textTransform: "capitalize",
+          background: "var(--accent-faint)",
+          border: "1px solid var(--line)",
+          borderRadius: 8,
+          padding: "3px 10px",
+          fontSize: "0.9rem",
+          fontWeight: 500,
+        }}>
+          {format(monthDate, "MMMM yyyy")}
+        </span>
       </div>
 
       <div className="controls-row">
@@ -100,7 +171,7 @@ export function Toolbar({
           onMonthTheme={onMonthTheme}
         />
         <div className="group">
-          <button type="button" className="ghost-btn" onClick={onNewBooking}>
+          <button type="button" className="primary-btn" onClick={onNewBooking}>
             <Plus size={15} />
             Nuova prenotazione
           </button>
@@ -128,7 +199,7 @@ export function Toolbar({
           <button
             type="button"
             className={syncError ? "ghost-btn danger-btn" : "ghost-btn"}
-            title={syncError ? "Sync offline — clicca per ritentare il caricamento" : "Forza caricamento dati sul cloud"}
+            title={syncError ? "Sync offline — clicca per ritentare" : "Forza caricamento dati sul cloud"}
             onClick={onForceSync}
           >
             <CloudUpload size={15} />

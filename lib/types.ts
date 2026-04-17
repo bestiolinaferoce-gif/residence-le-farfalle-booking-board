@@ -1,9 +1,8 @@
 export const LODGES = [
-  "Camera 1",
-  "Camera 2",
-  "Camera 3",
-  "Camera 4",
-  "Camera 5",
+  "Limone",
+  "Macaone",
+  "Vanessa",
+  "Aurora",
 ] as const;
 
 export const BOOKING_STATUSES = ["confirmed", "option", "blocked", "cancelled"] as const;
@@ -13,9 +12,22 @@ export type Lodge = (typeof LODGES)[number];
 export type BookingStatus = (typeof BOOKING_STATUSES)[number];
 export type BookingChannel = (typeof BOOKING_CHANNELS)[number];
 
+/** Origine record (audit / n8n / merge). Opzionale per retrocompatibilità. */
+export type BookingDataOrigin = "manual" | "import_json" | "import_email" | "sync" | "n8n";
+
+export const BOOKING_DATA_ORIGINS: readonly BookingDataOrigin[] = [
+  "manual",
+  "import_json",
+  "import_email",
+  "sync",
+  "n8n",
+] as const;
+
 export type GuestProfile = {
   surname?: string;
   firstName?: string;
+  email?: string;
+  phone?: string;
   birthDate?: string;
   birthPlace?: string;
   birthProvince?: string;
@@ -24,6 +36,9 @@ export type GuestProfile = {
   gender?: "M" | "F" | "";
   fiscalCode?: string;
   residence?: string;
+  residenceCity?: string;
+  residenceProvince?: string;
+  residencePostalCode?: string;
   documentType?: "CARTA_IDENTITA" | "PASSAPORTO" | "PATENTE" | "PERMESSO_SOGGIORNO" | "";
   documentNumber?: string;
   documentIssuePlace?: string;
@@ -43,10 +58,19 @@ export type Booking = {
   totalAmount: number;
   depositAmount: number;
   depositReceived: boolean;
+  extrasAmount?: number;
+  cleaningFee?: number;
+  touristTax?: number;
+  childrenCount?: number;
+  economicNotes?: string;
+  checkInTime?: string;
+  checkOutTime?: string;
+  breakfastIncluded?: boolean;
   createdAt: string;
   updatedAt: string;
   isNew?: boolean;
   guestProfile?: GuestProfile;
+  dataOrigin?: BookingDataOrigin;
 };
 
 export type BookingInput = Omit<Booking, "id" | "createdAt" | "updatedAt">;

@@ -37,11 +37,10 @@ function barColors(channel: string, status: string): { bg: string; text: string 
 }
 
 const LODGE_COLORS: Record<Lodge, { dot: string }> = {
-  "Camera 1": { dot: "#8b5cf6" },
-  "Camera 2": { dot: "#a855f7" },
-  "Camera 3": { dot: "#c084fc" },
-  "Camera 4": { dot: "#7c3aed" },
-  "Camera 5": { dot: "#6d28d9" },
+  Limone:  { dot: "#7c3aed" },
+  Macaone: { dot: "#a855f7" },
+  Vanessa: { dot: "#c084fc" },
+  Aurora:  { dot: "#6d28d9" },
 };
 
 type CellInfo = { booking: Booking; isFirst: boolean; span: number };
@@ -198,7 +197,7 @@ export function GanttBoard({
           display: "grid",
           gridTemplateColumns: gridCols,
           minWidth: 0,
-          borderBottom: "1px solid #e5e7eb",
+          borderBottom: "1px solid var(--border-strong, #e5e7eb)",
         }}
       >
         <div className="gantt-label-col">Lodge</div>
@@ -227,7 +226,7 @@ export function GanttBoard({
               display: "grid",
               gridTemplateColumns: gridCols,
               minWidth: 0,
-              borderBottom: "1px solid #e5e7eb",
+              borderBottom: "1px solid var(--border-strong, #e5e7eb)",
             }}
           >
             <div className="gantt-lodge-label">

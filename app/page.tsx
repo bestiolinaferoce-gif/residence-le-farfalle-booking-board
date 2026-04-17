@@ -58,6 +58,14 @@ export default function Home() {
       syncLocalToCloud: s.syncLocalToCloud,
     }))
   );
+  const { darkMode, toggleDarkMode, accentColor, setAccentColor } = useBookingStore(
+    useShallow((s) => ({
+      darkMode: s.darkMode,
+      toggleDarkMode: s.toggleDarkMode,
+      accentColor: s.accentColor,
+      setAccentColor: s.setAccentColor,
+    }))
+  );
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Booking | null>(null);
@@ -234,6 +242,15 @@ export default function Home() {
     return computeLodgeSummaries(monthDate, inMonth);
   }, [bookings, filters, monthDate, monthDays]);
 
+  // Apply dark mode class to html element
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+  }, [darkMode]);
+
   useEffect(() => {
     const MONTH_ACCENTS: Record<number, string> = {
       0: "#4c1d95",
@@ -249,14 +266,19 @@ export default function Home() {
       10: "#6d28d9",
       11: "#7c3aed",
     };
-    const accent = monthTheme ? (MONTH_ACCENTS[getMonth(monthDate)] ?? "#1d4ed8") : "#1d4ed8";
+    // Use accentColor from store; monthly variation only if default violet + monthTheme
+    const isDefaultViolet = accentColor === "#7c3aed";
+    const accent = (monthTheme && isDefaultViolet)
+      ? (MONTH_ACCENTS[getMonth(monthDate)] ?? accentColor)
+      : accentColor;
     const r = parseInt(accent.slice(1, 3), 16);
     const g = parseInt(accent.slice(3, 5), 16);
     const b = parseInt(accent.slice(5, 7), 16);
     document.documentElement.style.setProperty("--accent", accent);
-    document.documentElement.style.setProperty("--today-bg", `rgba(${r}, ${g}, ${b}, 0.04)`);
-    document.documentElement.style.setProperty("--today-border", `rgba(${r}, ${g}, ${b}, 0.2)`);
-  }, [monthDate, monthTheme]);
+    document.documentElement.style.setProperty("--accent-faint", `rgba(${r}, ${g}, ${b}, 0.07)`);
+    document.documentElement.style.setProperty("--today-bg", `rgba(${r}, ${g}, ${b}, 0.06)`);
+    document.documentElement.style.setProperty("--today-border", `rgba(${r}, ${g}, ${b}, 0.25)`);
+  }, [monthDate, monthTheme, accentColor]);
 
   const yearOptions = useMemo(() => {
     const year = getYear(monthDate);
@@ -295,6 +317,10 @@ export default function Home() {
         visibleTotal={visibleSummary.total}
         visibleDeposits={visibleSummary.deposits}
         newBookingsCount={newBookingsCount}
+        darkMode={darkMode}
+        onToggleDarkMode={toggleDarkMode}
+        accentColor={accentColor}
+        onSetAccentColor={setAccentColor}
       />
 
       <section className="print-title">
@@ -372,6 +398,14 @@ export default function Home() {
         </div>
       )}
       <Toast />
+
+      <footer className="app-footer no-print">
+        Gestito da Residence Le Farfalle · Via Capo delle Colonne, 88841 Isola di Capo Rizzuto (KR) ·{" "}
+        <a href="https://www.residencelefarfalle.com" target="_blank" rel="noopener noreferrer">
+          residencelefarfalle.com
+        </a>
+        {" "}· 📞 +39 3500979130
+      </footer>
     </main>
     </PasswordGate>
   );
