@@ -57,6 +57,7 @@ type BookingState = {
   };
   exportBookings: () => Booking[];
   forceSyncToCloud: () => Promise<void>;
+  flushSyncToCloud: () => Promise<boolean>;
   syncLocalToCloud: () => Promise<{ merged: number; updated: number; total: number }>;
   toast: { message: string; type: "success" | "error"; durationMs?: number } | null;
   showToast: (message: string, type?: "success" | "error", durationMs?: number) => void;
@@ -72,10 +73,15 @@ function channelAndStatusFromImport(item: Partial<Booking> & { source?: string }
   status: Booking["status"];
 } {
   let channel: Booking["channel"] = "direct";
-  if (item.channel && (BOOKING_CHANNELS as readonly string[]).includes(item.channel)) {
-    channel = item.channel;
+  const channelRaw = typeof item.channel === "string" ? item.channel.trim().toLowerCase() : "";
+  if (channelRaw) {
+    if (channelRaw === "booking.com") {
+      channel = "booking";
+    } else if ((BOOKING_CHANNELS as readonly string[]).includes(channelRaw)) {
+      channel = channelRaw as Booking["channel"];
+    }
   } else {
-    const s = String(item.source ?? "").toLowerCase();
+    const s = `${String(item.source ?? "")} ${String(item.notes ?? "")}`.toLowerCase();
     if (s.includes("airbnb")) channel = "airbnb";
     else if (s.includes("booking")) channel = "booking";
     else if (s.includes("expedia")) channel = "expedia";
@@ -265,6 +271,39 @@ function persistSettings(patch: Partial<{ monthTheme: boolean; serverVersion: nu
 export const useBookingStore = create<BookingState>((set, get) => {
   let persistTimer: ReturnType<typeof setTimeout> | null = null;
 
+  async function pushBookingsToCloud(bookings: Booking[], options?: { keepalive?: boolean }): Promise<{ ok: boolean; version?: number }> {
+    try {
+      const response = await fetch("/api/bookings", {
+        method: "POST",
+        headers: internalPostBookingsHeaders(),
+        body: JSON.stringify({ bookings }),
+        keepalive: options?.keepalive ?? false,
+      });
+      if (!response.ok) {
+        set({ syncError: true });
+        return { ok: false };
+      }
+
+      const body = (await response.json()) as { ok?: boolean; v?: number };
+      if (body.ok === false) {
+        set({ syncError: true });
+        return { ok: false };
+      }
+
+      if (typeof body.v === "number") {
+        set({ syncError: false, serverVersion: body.v });
+        persistSettings({ serverVersion: body.v });
+        return { ok: true, version: body.v };
+      }
+
+      set({ syncError: false });
+      return { ok: true };
+    } catch {
+      set({ syncError: true });
+      return { ok: false };
+    }
+  }
+
   function pushBackupSnapshot(bookings: Booking[]): void {
     if (typeof window === "undefined") return;
     try {
@@ -287,33 +326,7 @@ export const useBookingStore = create<BookingState>((set, get) => {
     if (persistTimer !== null) clearTimeout(persistTimer);
     persistTimer = setTimeout(() => {
       persistTimer = null;
-      fetch("/api/bookings", {
-        method: "POST",
-        headers: internalPostBookingsHeaders(),
-        body: JSON.stringify({ bookings }),
-      })
-        .then(async (r) => {
-          if (!r.ok) {
-            set({ syncError: true });
-            return;
-          }
-          try {
-            const res = (await r.json()) as { ok?: boolean; v?: number };
-            if (res.ok === false) {
-              set({ syncError: true });
-              return;
-            }
-            if (typeof res.v === "number") {
-              set({ syncError: false, serverVersion: res.v });
-              persistSettings({ serverVersion: res.v });
-            } else {
-              set({ syncError: false });
-            }
-          } catch {
-            set({ syncError: true });
-          }
-        })
-        .catch(() => set({ syncError: true }));
+      void pushBookingsToCloud(bookings);
     }, 250);
   }
 
@@ -367,7 +380,7 @@ export const useBookingStore = create<BookingState>((set, get) => {
               typeof payload === "object" && payload !== null && !Array.isArray(payload)
                 ? ((payload as { v?: number }).v ?? 0)
                 : 0;
-            if (incomingV < get().serverVersion) {
+            if (incomingV < get().serverVersion && get().bookings.length > 0) {
               return;
             }
             const migrated = migrateBookings(data as Array<Booking & { guestsCount?: number }>);
@@ -430,7 +443,7 @@ export const useBookingStore = create<BookingState>((set, get) => {
             if (!full.ok) throw new Error("full fetch failed");
             const payload = (await full.json()) as { v?: number; data?: Booking[] } | Booking[];
             const newV = Array.isArray(payload) ? v : (payload.v ?? v);
-            if (newV < get().serverVersion) {
+            if (newV < get().serverVersion && get().bookings.length > 0) {
               return;
             }
             const data = Array.isArray(payload) ? payload : (payload.data ?? []);
@@ -602,6 +615,17 @@ export const useBookingStore = create<BookingState>((set, get) => {
           totalAmount: Number(item.totalAmount ?? item.grossEarnings ?? 0),
           depositAmount: Number(item.depositAmount ?? item.deposit ?? 0),
           depositReceived: Boolean(item.depositReceived),
+          childrenCount: Number.isFinite(item.childrenCount)
+            ? Number(item.childrenCount)
+            : Number.isFinite((item as { children?: number }).children)
+              ? Number((item as { children?: number }).children)
+              : undefined,
+          breakfastIncluded:
+            typeof item.breakfastIncluded === "boolean"
+              ? item.breakfastIncluded
+              : typeof (item as { breakfast?: boolean }).breakfast === "boolean"
+                ? (item as { breakfast?: boolean }).breakfast
+                : undefined,
           createdAt: item.createdAt || new Date().toISOString(),
           updatedAt,
           dataOrigin,
@@ -659,7 +683,7 @@ export const useBookingStore = create<BookingState>((set, get) => {
           };
           validateBookingPayload(payload);
           ensureNoOverlap(Array.from(map.values()), payload, candidate.id);
-          map.set(candidate.id, candidate);
+          map.set(candidate.id, { ...candidate, updatedAt: new Date().toISOString() });
           merged += 1;
         } catch (e) {
           const msg = e instanceof Error ? e.message : "Errore sconosciuto.";
@@ -683,6 +707,15 @@ export const useBookingStore = create<BookingState>((set, get) => {
         return;
       }
       try {
+        if (persistTimer !== null) {
+          clearTimeout(persistTimer);
+          persistTimer = null;
+        }
+        const pushResult = await pushBookingsToCloud(cur);
+        if (!pushResult.ok) {
+          get().showToast("Errore durante il caricamento sul cloud.", "error");
+          return;
+        }
         const mergeRes = await fetch("/api/bookings/merge-local", {
           method: "POST",
           headers: internalPostBookingsHeaders(),
@@ -703,6 +736,17 @@ export const useBookingStore = create<BookingState>((set, get) => {
         set({ syncError: true });
         get().showToast("Errore di rete durante il sync.", "error");
       }
+    },
+    flushSyncToCloud: async () => {
+      if (typeof window === "undefined") return false;
+      const cur = get().bookings;
+      if (cur.length === 0) return true;
+      if (persistTimer !== null) {
+        clearTimeout(persistTimer);
+        persistTimer = null;
+      }
+      const result = await pushBookingsToCloud(cur, { keepalive: true });
+      return result.ok;
     },
     syncLocalToCloud: async () => {
       pushBackupSnapshot(get().bookings);

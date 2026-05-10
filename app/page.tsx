@@ -41,7 +41,7 @@ export default function Home() {
       setShowCancelled: s.setShowCancelled,
     }))
   );
-  const { load, startPolling, syncError, hasNewBookings, clearNewBookingsNotification, addBooking, updateBooking, deleteBooking, importBookingsMerge, exportBookings, showToast, forceSyncToCloud, syncLocalToCloud } = useBookingStore(
+  const { load, startPolling, syncError, hasNewBookings, clearNewBookingsNotification, addBooking, updateBooking, deleteBooking, importBookingsMerge, exportBookings, showToast, forceSyncToCloud, flushSyncToCloud, syncLocalToCloud } = useBookingStore(
     useShallow((s) => ({
       load: s.load,
       startPolling: s.startPolling,
@@ -55,6 +55,7 @@ export default function Home() {
       exportBookings: s.exportBookings,
       showToast: s.showToast,
       forceSyncToCloud: s.forceSyncToCloud,
+      flushSyncToCloud: s.flushSyncToCloud,
       syncLocalToCloud: s.syncLocalToCloud,
     }))
   );
@@ -82,6 +83,15 @@ export default function Home() {
     const stop = startPolling();
     return stop;
   }, [startPolling]);
+
+  useEffect(() => {
+    function handlePageHide() {
+      void flushSyncToCloud();
+    }
+
+    window.addEventListener("pagehide", handlePageHide);
+    return () => window.removeEventListener("pagehide", handlePageHide);
+  }, [flushSyncToCloud]);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -309,6 +319,7 @@ export default function Home() {
         onExport={onExport}
         onCopyIcal={onCopyIcal}
         onForceSync={() => forceSyncToCloud()}
+        onLogout={() => flushSyncToCloud()}
         onSyncLocal={() => syncLocalToCloud()}
         syncError={syncError}
         hasNewBookings={hasNewBookings}

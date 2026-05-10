@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "import:discovered-bookings": "node scripts/import-bookings-from-discovery.mjs"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.15",

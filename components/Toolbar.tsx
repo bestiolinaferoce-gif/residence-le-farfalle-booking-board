@@ -39,6 +39,7 @@ type ToolbarProps = {
   onExport: () => void;
   onCopyIcal: () => void;
   onForceSync: () => void;
+  onLogout?: () => Promise<unknown> | void;
   onSyncLocal?: () => void;
   syncError: boolean;
   hasNewBookings?: boolean;
@@ -73,6 +74,7 @@ export function Toolbar({
   onExport,
   onCopyIcal,
   onForceSync,
+  onLogout,
   onSyncLocal,
   syncError,
   hasNewBookings = false,
@@ -86,9 +88,13 @@ export function Toolbar({
   accentColor,
   onSetAccentColor,
 }: ToolbarProps) {
-  function handleLogout() {
-    sessionStorage.removeItem("le-farfalle:auth");
-    window.location.reload();
+  async function handleLogout() {
+    try {
+      await onLogout?.();
+    } finally {
+      sessionStorage.removeItem("le-farfalle:auth");
+      window.location.reload();
+    }
   }
 
   return (
