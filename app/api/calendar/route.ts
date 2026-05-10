@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { Booking } from '@/lib/types';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 const BASE = process.env.KV_REST_API_URL ?? '';
 const TOKEN = process.env.KV_REST_API_TOKEN ?? '';
 const KEY = 'lfb_bookings';
