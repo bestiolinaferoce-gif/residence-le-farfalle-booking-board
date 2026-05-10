@@ -59,6 +59,20 @@ type BookingState = {
   forceSyncToCloud: () => Promise<void>;
   flushSyncToCloud: () => Promise<boolean>;
   syncLocalToCloud: () => Promise<{ merged: number; updated: number; total: number }>;
+  runChannelSync: () => Promise<{
+    created: number;
+    updated: number;
+    cancelled: number;
+    conflicts: Array<{
+      channel: "airbnb" | "booking";
+      lodge: string;
+      checkIn: string;
+      checkOut: string;
+      incomingGuestName: string;
+      existingGuestName: string;
+      existingId: string;
+    }>;
+  }>;
   toast: { message: string; type: "success" | "error"; durationMs?: number } | null;
   showToast: (message: string, type?: "success" | "error", durationMs?: number) => void;
   clearToast: () => void;
@@ -793,6 +807,70 @@ export const useBookingStore = create<BookingState>((set, get) => {
       } catch {
         get().showToast("Errore di rete durante la sincronizzazione.", "error");
         return { merged: 0, updated: 0, total: 0 };
+      }
+    },
+    runChannelSync: async () => {
+      try {
+        const res = await fetch("/api/channel-sync", {
+          method: "POST",
+          headers: internalPostBookingsHeaders(),
+        });
+        const data = (await res.json()) as {
+          ok?: boolean;
+          error?: string;
+          created?: number;
+          updated?: number;
+          cancelled?: number;
+          conflicts?: Array<{
+            channel: "airbnb" | "booking";
+            lodge: string;
+            checkIn: string;
+            checkOut: string;
+            incomingGuestName: string;
+            existingGuestName: string;
+            existingId: string;
+          }>;
+        };
+
+        if (!res.ok || data.ok === false) {
+          get().showToast(data.error ?? "Errore durante la sync dei canali.", "error");
+          return { created: 0, updated: 0, cancelled: 0, conflicts: [] };
+        }
+
+        const cloud = await fetchCloudPayload();
+        const mergedRows = mergeKvWithLocal(
+          migrateBookings(cloud.data as Array<Booking & { guestsCount?: number }>),
+          get().bookings,
+          get().deletedIds
+        );
+        set({ bookings: mergedRows, serverVersion: cloud.version, syncError: false });
+        if (typeof window !== "undefined") {
+          window.localStorage.setItem(STORAGE_KEY, JSON.stringify(mergedRows));
+          persistSettings({ serverVersion: cloud.version });
+        }
+
+        const conflicts = data.conflicts ?? [];
+        if (conflicts.length > 0) {
+          get().showToast(
+            `Sync canali completata: ${data.created ?? 0} nuove, ${data.updated ?? 0} aggiornate, ${data.cancelled ?? 0} cancellate. Attenzione: ${conflicts.length} conflitti da verificare.`,
+            "error",
+            9000
+          );
+        } else {
+          get().showToast(
+            `Sync canali completata: ${data.created ?? 0} nuove, ${data.updated ?? 0} aggiornate, ${data.cancelled ?? 0} cancellate.`
+          );
+        }
+
+        return {
+          created: data.created ?? 0,
+          updated: data.updated ?? 0,
+          cancelled: data.cancelled ?? 0,
+          conflicts,
+        };
+      } catch {
+        get().showToast("Errore di rete durante la sync dei canali.", "error");
+        return { created: 0, updated: 0, cancelled: 0, conflicts: [] };
       }
     },
   };

@@ -39,6 +39,7 @@ type ToolbarProps = {
   onExport: () => void;
   onCopyIcal: () => void;
   onForceSync: () => void;
+  onChannelSync: () => void;
   onLogout?: () => Promise<unknown> | void;
   onSyncLocal?: () => void;
   syncError: boolean;
@@ -74,6 +75,7 @@ export function Toolbar({
   onExport,
   onCopyIcal,
   onForceSync,
+  onChannelSync,
   onLogout,
   onSyncLocal,
   syncError,
@@ -210,6 +212,15 @@ export function Toolbar({
           >
             <CloudUpload size={15} />
             Sync
+          </button>
+          <button
+            type="button"
+            className="ghost-btn"
+            title="Importa automaticamente Booking.com e Airbnb dai feed iCal configurati"
+            onClick={onChannelSync}
+          >
+            <Calendar size={15} />
+            Sync canali
           </button>
           {onSyncLocal && (
             <button

@@ -71,6 +71,9 @@ export type Booking = {
   isNew?: boolean;
   guestProfile?: GuestProfile;
   dataOrigin?: BookingDataOrigin;
+  externalSyncKey?: string;
+  externalCalendarName?: string;
+  externalLastSeenAt?: string;
 };
 
 export type BookingInput = Omit<Booking, "id" | "createdAt" | "updatedAt">;

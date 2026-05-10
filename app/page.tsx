@@ -41,7 +41,7 @@ export default function Home() {
       setShowCancelled: s.setShowCancelled,
     }))
   );
-  const { load, startPolling, syncError, hasNewBookings, clearNewBookingsNotification, addBooking, updateBooking, deleteBooking, importBookingsMerge, exportBookings, showToast, forceSyncToCloud, flushSyncToCloud, syncLocalToCloud } = useBookingStore(
+  const { load, startPolling, syncError, hasNewBookings, clearNewBookingsNotification, addBooking, updateBooking, deleteBooking, importBookingsMerge, exportBookings, showToast, forceSyncToCloud, flushSyncToCloud, syncLocalToCloud, runChannelSync } = useBookingStore(
     useShallow((s) => ({
       load: s.load,
       startPolling: s.startPolling,
@@ -57,6 +57,7 @@ export default function Home() {
       forceSyncToCloud: s.forceSyncToCloud,
       flushSyncToCloud: s.flushSyncToCloud,
       syncLocalToCloud: s.syncLocalToCloud,
+      runChannelSync: s.runChannelSync,
     }))
   );
   const { darkMode, toggleDarkMode, accentColor, setAccentColor } = useBookingStore(
@@ -319,6 +320,7 @@ export default function Home() {
         onExport={onExport}
         onCopyIcal={onCopyIcal}
         onForceSync={() => forceSyncToCloud()}
+        onChannelSync={() => runChannelSync()}
         onLogout={() => flushSyncToCloud()}
         onSyncLocal={() => syncLocalToCloud()}
         syncError={syncError}
