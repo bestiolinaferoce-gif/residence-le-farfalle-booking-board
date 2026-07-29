@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import type { Booking } from '@/lib/types';
+import { UNASSIGNED_LODGE, type Booking } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -38,6 +38,15 @@ function foldLine(line: string): string {
 }
 
 export async function GET(req: NextRequest) {
+  // I crawler di Booking e Airbnb non fanno login: l'unica difesa è un token nell'URL.
+  const expectedToken = process.env.ICAL_FEED_TOKEN?.trim();
+  if (expectedToken) {
+    const provided = req.nextUrl.searchParams.get('token')?.trim() ?? '';
+    if (provided !== expectedToken) {
+      return new NextResponse('Forbidden', { status: 403 });
+    }
+  }
+
   const lodgeFilter = req.nextUrl.searchParams.get('lodge');
 
   let bookings: Booking[] = [];
@@ -60,6 +69,9 @@ export async function GET(req: NextRequest) {
 
   const filtered = bookings.filter((b) => {
     if (lodgeFilter && b.lodge !== lodgeFilter) return false;
+    // Non ancora assegnate a un'unità: annunciarle come occupate bloccherebbe
+    // inventario che potrebbe non esistere. Restano fuori finché l'host non conferma.
+    if (b.lodge === UNASSIGNED_LODGE) return false;
     return b.status !== 'cancelled';
   });
 

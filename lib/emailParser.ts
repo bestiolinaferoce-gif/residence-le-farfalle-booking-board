@@ -1,4 +1,4 @@
-import type { Booking, BookingChannel } from "./types";
+import type { BookingChannel, BookingPrefill } from "./types";
 import { LODGES } from "./types";
 
 const LODGE_REGEX = new RegExp(`\\b(${LODGES.join("|")})\\b`, "i");
@@ -114,7 +114,7 @@ function extractChannel(text: string): BookingChannel | undefined {
   return undefined;
 }
 
-export function parseEmail(text: string): Partial<Booking> {
+export function parseEmail(text: string): BookingPrefill {
   let guestName = "";
   const namePatterns = [
     // Email salutation: "Gentile Mario Rossi" / "Dear John Smith"
@@ -150,7 +150,7 @@ export function parseEmail(text: string): Partial<Booking> {
 
   const channel = extractChannel(text);
 
-  const result: Partial<Booking> = {};
+  const result: BookingPrefill = {};
   if (guestName) result.guestName = guestName;
   if (checkIn) result.checkIn = checkIn;
   if (checkOut) result.checkOut = checkOut;

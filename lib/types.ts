@@ -8,7 +8,21 @@ export const LODGES = [
 export const BOOKING_STATUSES = ["confirmed", "option", "blocked", "cancelled"] as const;
 export const BOOKING_CHANNELS = ["direct", "airbnb", "booking", "expedia", "other"] as const;
 
+/**
+ * I feed iCal di Booking.com e Airbnb vendono l'inventario complessivo, non la singola
+ * unità: le prenotazioni importate arrivano senza lodge. Restano in questa corsia finché
+ * l'host non conferma l'assegnazione. Non è un'unità fisica: esclusa da occupancy,
+ * controllo sovrapposizioni ed export iCal.
+ */
+export const UNASSIGNED_LODGE = "Da assegnare";
+
 export type Lodge = (typeof LODGES)[number];
+/** Il lodge di una prenotazione può essere ancora da assegnare. */
+export type BookingLodge = Lodge | typeof UNASSIGNED_LODGE;
+
+export function isAssignedLodge(lodge: BookingLodge): lodge is Lodge {
+  return lodge !== UNASSIGNED_LODGE;
+}
 export type BookingStatus = (typeof BOOKING_STATUSES)[number];
 export type BookingChannel = (typeof BOOKING_CHANNELS)[number];
 
@@ -48,7 +62,7 @@ export type GuestProfile = {
 export type Booking = {
   id: string;
   guestName: string;
-  lodge: Lodge;
+  lodge: BookingLodge;
   checkIn: string;
   checkOut: string;
   status: BookingStatus;
@@ -73,12 +87,30 @@ export type Booking = {
   dataOrigin?: BookingDataOrigin;
   /** Numero prenotazione del canale (Booking.com/Airbnb). Chiave di deduplica in import e sync. */
   bookingRef?: string;
+  /**
+   * Lodge libero proposto dal sync per una prenotazione in "Da assegnare".
+   * È solo un suggerimento: l'assegnazione la conferma l'host.
+   */
+  proposedLodge?: Lodge;
+  /** Nessun lodge libero per quelle date: overbooking da risolvere a mano. */
+  overbooking?: boolean;
+  /** Id di prenotazioni che potrebbero essere la stessa: segnalate, mai cancellate d'ufficio. */
+  possibleDuplicateOf?: string[];
   externalSyncKey?: string;
   externalCalendarName?: string;
   externalLastSeenAt?: string;
 };
 
 export type BookingInput = Omit<Booking, "id" | "createdAt" | "updatedAt">;
+
+/**
+ * Valori precompilati del form "Nuova prenotazione". Il lodge è ristretto alle unità
+ * fisiche: "Da assegnare" nasce solo dai feed dei canali, mai da una creazione manuale.
+ */
+export type BookingPrefill = Omit<Partial<BookingInput>, "lodge"> & {
+  lodge?: Lodge;
+  day?: string;
+};
 
 export type BookingFilters = {
   search: string;

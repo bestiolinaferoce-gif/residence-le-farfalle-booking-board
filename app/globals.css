@@ -1459,3 +1459,233 @@ body {
   align-items: center;
   gap: 4px;
 }
+
+/* ── Prenotazioni da assegnare (feed di struttura Booking.com / Airbnb) ───────── */
+
+.pending-assignments {
+  background: var(--panel);
+  border: 1px solid #f59e0b;
+  border-left: 4px solid #f59e0b;
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+}
+
+.pending-assignments-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #b45309;
+  font-size: 14px;
+  margin-bottom: 10px;
+}
+
+.dark .pending-assignments-head {
+  color: #fbbf24;
+}
+
+.pending-badge {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--hover-bg);
+  color: var(--muted);
+}
+
+.pending-badge-danger {
+  background: rgba(220, 38, 38, 0.12);
+  color: #dc2626;
+}
+
+.pending-assignments-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pending-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--panel-raised);
+}
+
+.pending-item-danger {
+  background: rgba(220, 38, 38, 0.08);
+}
+
+.pending-item-info {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+
+.pending-guest {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.pending-dates,
+.pending-channel {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.pending-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pending-btn {
+  font-size: 13px;
+  padding: 5px 10px;
+}
+
+.pending-overbooking {
+  font-size: 13px;
+  font-weight: 600;
+  color: #dc2626;
+}
+
+/* Corsia "Da assegnare" nel Gantt: fuori dalle 4 unità fisiche. */
+.gantt-row-unassigned .gantt-lodge-label {
+  color: #b45309;
+  font-style: italic;
+}
+
+.dark .gantt-row-unassigned .gantt-lodge-label {
+  color: #fbbf24;
+}
+
+.gantt-row-unassigned .gantt-cell-empty {
+  cursor: default;
+  background: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 4px,
+    rgba(245, 158, 11, 0.07) 4px,
+    rgba(245, 158, 11, 0.07) 8px
+  );
+}
+
+@media (max-width: 640px) {
+  .pending-item {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .pending-item-actions {
+    justify-content: flex-end;
+  }
+}
+
+/* ── Dialogo PDF disponibilità ────────────────────────────────────────────────── */
+
+.pdf-dialog { max-width: 620px; }
+
+.pdf-dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 4px 0;
+}
+
+.pdf-fieldset {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin: 0;
+}
+
+.pdf-fieldset legend {
+  padding: 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.pdf-period-options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pdf-radio {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.pdf-custom-range {
+  display: flex;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.pdf-custom-range label,
+.pdf-tax-grid label,
+.pdf-full {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.pdf-tax-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 14px;
+}
+
+.pdf-full { margin-top: 10px; }
+
+.pdf-season { display: flex; gap: 6px; }
+
+.pdf-dialog input[type="text"],
+.pdf-dialog input[type="date"],
+.pdf-dialog input[type="number"] {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--input-bg);
+  color: var(--text);
+  font-size: 14px;
+}
+
+.pdf-hint {
+  margin: 0 0 10px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.pdf-warning,
+.pdf-error {
+  margin: 10px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #dc2626;
+}
+
+@media (max-width: 560px) {
+  .pdf-tax-grid,
+  .pdf-custom-range {
+    grid-template-columns: 1fr;
+    flex-direction: column;
+  }
+}

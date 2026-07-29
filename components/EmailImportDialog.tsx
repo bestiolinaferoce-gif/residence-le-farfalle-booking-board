@@ -3,18 +3,18 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import { useState } from "react";
-import type { BookingInput, Lodge } from "@/lib/types";
+import type { BookingPrefill } from "@/lib/types";
 import { parseEmail } from "@/lib/emailParser";
 
 type EmailImportDialogProps = {
   open: boolean;
   onClose: () => void;
-  onCreateFromPrefill: (prefill: Partial<BookingInput> & { lodge?: Lodge }) => void;
+  onCreateFromPrefill: (prefill: BookingPrefill) => void;
 };
 
 export function EmailImportDialog({ open, onClose, onCreateFromPrefill }: EmailImportDialogProps) {
   const [text, setText] = useState("");
-  const [parsed, setParsed] = useState<Partial<BookingInput> | null>(null);
+  const [parsed, setParsed] = useState<BookingPrefill | null>(null);
 
   function analyze() {
     const result = parseEmail(text);
