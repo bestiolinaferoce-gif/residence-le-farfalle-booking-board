@@ -62,21 +62,32 @@ Dopo aver salvato le variabili serve un **redeploy** perché vengano lette.
 
 ## 2. Cadenza del cron
 
-Configurata in [`vercel.json`](vercel.json) a **ogni 3 ore** (8 esecuzioni al giorno).
+Configurata in [`vercel.json`](vercel.json) a **una volta al giorno alle 04:00 UTC**
+(06:00 ora italiana in estate): prima che inizino i check-in, dopo le prenotazioni notturne.
 
-Il motivo: la finestra di overbooking coincide con il tempo che passa tra una prenotazione
-su un canale e il momento in cui la board la vede. Con una sola esecuzione giornaliera
-quella finestra dura fino a 24 ore — in alta stagione è il tempo sufficiente perché una
-camera venga venduta due volte. Con 3 ore il rischio residuo è ridotto di otto volte, a un
-costo trascurabile.
+**Questa non è la cadenza ideale, è quella consentita dal piano.** Il progetto è su piano
+Hobby, che limita i cron a un'esecuzione giornaliera: con `0 */3 * * *` il deploy viene
+rifiutato con l'errore
 
-> **Nota sul piano Vercel.** I cron sub-giornalieri richiedono il piano Pro. Su piano Hobby
-> il deploy viene rifiutato con un errore sui limiti: in quel caso porta `schedule` a
-> `"0 4 * * *"` (una volta al giorno alle 4). Il requisito minimo — almeno una volta al
-> giorno — resta comunque soddisfatto.
+> Hobby accounts are limited to daily cron jobs.
 
-Il pulsante **Sync canali** nell'app resta disponibile per una sincronizzazione manuale
-immediata, indipendente dal cron.
+La cadenza giusta sarebbe **ogni 3 ore**. Il motivo: la finestra di overbooking coincide
+col tempo che passa tra una vendita su un canale e il momento in cui la board la vede. Con
+una sola esecuzione al giorno quella finestra resta larga fino a 24 ore — in alta stagione
+è tempo sufficiente perché la stessa camera venga venduta due volte, che è esattamente
+quanto è successo ad agosto 2026.
+
+Due modi per stringerla:
+
+1. **Piano Pro su Vercel.** Poi in `vercel.json` porta `schedule` a `"0 */3 * * *"`.
+2. **Scheduler esterno gratuito** (per esempio cron-job.org), puntato su
+   `https://residence-le-farfalle-booking-board.vercel.app/api/cron/channel-sync` con
+   header `Authorization: Bearer <CRON_SECRET>`. L'endpoint è lo stesso e verifica il
+   token, quindi funziona identicamente.
+
+Nel frattempo il pulsante **Sync canali** nell'app esegue una sincronizzazione manuale
+immediata: usalo quando ricevi una notifica di prenotazione da un canale e vuoi allineare
+la board senza aspettare il cron.
 
 ---
 
