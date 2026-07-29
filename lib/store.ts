@@ -178,11 +178,26 @@ function ensureNoOverlap(bookings: Booking[], payload: BookingInput, excludeId?:
   }
 }
 
+/** Campi duplicati di un import Booking.com del 2026-05: nessun consumatore li legge e divergono dai canonici. */
+const LEGACY_ALIAS_FIELDS = [
+  "room",
+  "adults",
+  "children",
+  "deposit",
+  "depositStatus",
+  "breakfast",
+  "nights",
+] as const;
+
 function migrateBookings(arr: Array<Booking & { guestsCount?: number }>): Booking[] {
-  return arr.map((item) => ({
-    ...item,
-    guestsCount: typeof item.guestsCount === "number" && item.guestsCount >= 1 ? item.guestsCount : 2,
-  })) as Booking[];
+  return arr.map((item) => {
+    const next: Record<string, unknown> = {
+      ...item,
+      guestsCount: typeof item.guestsCount === "number" && item.guestsCount >= 1 ? item.guestsCount : 2,
+    };
+    for (const field of LEGACY_ALIAS_FIELDS) delete next[field];
+    return next as Booking;
+  });
 }
 
 function internalPostBookingsHeaders(): HeadersInit {

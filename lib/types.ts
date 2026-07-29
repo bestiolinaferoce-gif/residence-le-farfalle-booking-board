@@ -71,6 +71,8 @@ export type Booking = {
   isNew?: boolean;
   guestProfile?: GuestProfile;
   dataOrigin?: BookingDataOrigin;
+  /** Numero prenotazione del canale (Booking.com/Airbnb). Chiave di deduplica in import e sync. */
+  bookingRef?: string;
   externalSyncKey?: string;
   externalCalendarName?: string;
   externalLastSeenAt?: string;
