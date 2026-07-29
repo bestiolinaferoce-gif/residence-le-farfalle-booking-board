@@ -14,6 +14,7 @@ import type { Booking, BookingFilters } from "@/lib/types";
 
 export const STORAGE_KEY = "le-farfalle-booking-board:v1";
 export const BACKUP_KEY = "le-farfalle-booking-board:backups:v1";
+export const TOURIST_TAX_KEY = "le-farfalle-booking-board:tourist-tax:v1";
 export const SETTINGS_KEY = "le-farfalle-booking-board:settings:v1";
 export const DELETED_KEY = "le-farfalle-booking-board:deleted:v1";
 

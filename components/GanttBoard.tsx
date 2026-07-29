@@ -10,8 +10,8 @@ import {
   startOfDay,
 } from "date-fns";
 import { useMemo } from "react";
-import type { Booking, BookingFilters, Lodge } from "@/lib/types";
-import { LODGES } from "@/lib/types";
+import type { Booking, BookingFilters, BookingLodge, Lodge } from "@/lib/types";
+import { LODGES, UNASSIGNED_LODGE } from "@/lib/types";
 
 // Colori celle basati su canale (Task spec)
 const CHANNEL_BAR_COLORS: Record<string, { bg: string; text: string }> = {
@@ -36,7 +36,8 @@ function barColors(channel: string, status: string): { bg: string; text: string 
   );
 }
 
-const LODGE_COLORS: Record<Lodge, { dot: string }> = {
+const LODGE_COLORS: Record<BookingLodge, { dot: string }> = {
+  [UNASSIGNED_LODGE]: { dot: "#f59e0b" },
   Limone:  { dot: "#7c3aed" },
   Macaone: { dot: "#a855f7" },
   Vanessa: { dot: "#c084fc" },
@@ -46,7 +47,7 @@ const LODGE_COLORS: Record<Lodge, { dot: string }> = {
 type CellInfo = { booking: Booking; isFirst: boolean; span: number };
 
 function buildCellMap(
-  lodge: Lodge,
+  lodge: BookingLodge,
   bookings: Booking[],
   monthDays: Date[]
 ): Map<number, CellInfo> {
@@ -91,13 +92,15 @@ type GanttBoardProps = {
 };
 
 function renderLodgeCells(
-  lodge: Lodge,
+  lodge: BookingLodge,
   cellMap: Map<number, CellInfo>,
   monthDays: Date[],
   today: Date,
   onCreate: (lodge: Lodge, day: Date) => void,
   onEdit: (booking: Booking) => void
 ) {
+  // Nella corsia "Da assegnare" non esiste un'unità su cui creare: celle non cliccabili.
+  const canCreate = lodge !== UNASSIGNED_LODGE;
   const cells: React.ReactNode[] = [];
   let i = 0;
   while (i < monthDays.length) {
@@ -109,9 +112,9 @@ function renderLodgeCells(
         <div
           key={i}
           className={`gantt-cell gantt-cell-empty${isToday ? " gantt-cell-today" : ""}${isWeekend ? " gantt-cell-weekend" : ""}`}
-          onClick={() => onCreate(lodge, monthDays[i])}
+          onClick={canCreate ? () => onCreate(lodge as Lodge, monthDays[i]) : undefined}
         >
-          <span className="gantt-add">+</span>
+          {canCreate && <span className="gantt-add">+</span>}
         </div>
       );
       i++;
@@ -189,6 +192,27 @@ export function GanttBoard({
   const daysCount = monthDays.length;
   const gridCols = `180px repeat(${daysCount}, minmax(32px, 1fr))`;
 
+  /**
+   * Le prenotazioni non assegnate si sovrappongono spesso sulle stesse date: in una
+   * riga sola l'ultima coprirebbe le precedenti. Le distribuisce su tracce disgiunte
+   * così restano tutte visibili. Vuoto = nessuna corsia, board a 4 righe come sempre.
+   */
+  const unassignedTracks = useMemo(() => {
+    const pending = visibleBookings
+      .filter((b) => b.lodge === UNASSIGNED_LODGE && b.status !== "cancelled")
+      .sort((a, b) => a.checkIn.localeCompare(b.checkIn));
+
+    const tracks: Booking[][] = [];
+    for (const booking of pending) {
+      const track = tracks.find(
+        (rows) => !rows.some((r) => r.checkIn < booking.checkOut && booking.checkIn < r.checkOut)
+      );
+      if (track) track.push(booking);
+      else tracks.push([booking]);
+    }
+    return tracks;
+  }, [visibleBookings]);
+
   return (
     <div className="gantt-wrap" style={{ overflowX: "auto" }}>
       <div
@@ -247,6 +271,34 @@ export function GanttBoard({
           </div>
         );
       })}
+
+      {/* Corsia dei feed di struttura: nessun lodge assegnato, in attesa dell'host. */}
+      {unassignedTracks.map((track, trackIndex) => (
+        <div
+          key={`unassigned-${trackIndex}`}
+          className="gantt-row gantt-row-unassigned"
+          style={{
+            display: "grid",
+            gridTemplateColumns: gridCols,
+            minWidth: 0,
+            borderTop: trackIndex === 0 ? "2px solid #f59e0b" : undefined,
+            borderBottom: "1px solid var(--border-strong, #e5e7eb)",
+          }}
+        >
+          <div className="gantt-lodge-label">
+            <span className="gantt-dot" style={{ background: LODGE_COLORS[UNASSIGNED_LODGE].dot }} />
+            {trackIndex === 0 ? UNASSIGNED_LODGE : ""}
+          </div>
+          {renderLodgeCells(
+            UNASSIGNED_LODGE,
+            buildCellMap(UNASSIGNED_LODGE, track, monthDays),
+            monthDays,
+            today,
+            onCreate,
+            onEdit
+          )}
+        </div>
+      ))}
     </div>
   );
 }

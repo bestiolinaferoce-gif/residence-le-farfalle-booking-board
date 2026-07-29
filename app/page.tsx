@@ -11,12 +11,16 @@ import { Toast } from "@/components/Toast";
 import { Toolbar } from "@/components/Toolbar";
 import { PasswordGate } from "@/components/PasswordGate";
 import { KPIPanel } from "@/components/KPIPanel";
-import { type Booking, type BookingInput, type Lodge, LODGES } from "@/lib/types";
+import { type Booking, type BookingInput, type BookingPrefill, type Lodge, LODGES } from "@/lib/types";
 import { useBookingStore } from "@/lib/store";
 import { useShallow } from "zustand/react/shallow";
 import { getMonthDays, isActiveOnDay, matchesFilters, toIsoDate } from "@/lib/utils";
 import { MonthSummary, computeLodgeSummaries } from "@/components/MonthSummary";
 import { MigrationHelper } from "@/components/MigrationHelper";
+import { PendingAssignments } from "@/components/PendingAssignments";
+import { AvailabilityPdfDialog } from "@/components/AvailabilityPdfDialog";
+import { EMPTY_TOURIST_TAX_SETTINGS, type TouristTaxSettings } from "@/lib/touristTax";
+import { TOURIST_TAX_KEY } from "@/lib/utils";
 
 export default function Home() {
   const { bookings, filters } = useBookingStore(
@@ -71,10 +75,27 @@ export default function Home() {
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Booking | null>(null);
-  const [prefill, setPrefill] = useState<Partial<BookingInput> & { lodge?: Lodge; day?: string }>({});
+  const [prefill, setPrefill] = useState<BookingPrefill>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importConfirm, setImportConfirm] = useState<{ incoming: Booking[] } | null>(null);
   const [emailImportOpen, setEmailImportOpen] = useState(false);
+  const [pdfDialogOpen, setPdfDialogOpen] = useState(false);
+  const [taxSettings, setTaxSettings] = useState<TouristTaxSettings>(EMPTY_TOURIST_TAX_SETTINGS);
+
+  // I parametri dell'imposta vivono in locale: sono di competenza dell'host, non dei dati.
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(TOURIST_TAX_KEY);
+      if (raw) setTaxSettings({ ...EMPTY_TOURIST_TAX_SETTINGS, ...JSON.parse(raw) });
+    } catch { /* impostazioni illeggibili: si riparte dai valori vuoti */ }
+  }, []);
+
+  function saveTaxSettings(next: TouristTaxSettings) {
+    setTaxSettings(next);
+    try {
+      window.localStorage.setItem(TOURIST_TAX_KEY, JSON.stringify(next));
+    } catch { /* quota piena: il PDF usa comunque i valori della sessione */ }
+  }
 
   useEffect(() => {
     load();
@@ -130,7 +151,7 @@ export default function Home() {
     setDialogOpen(true);
   }
 
-  function openNewBookingFromPrefill(prefillData: Partial<BookingInput> & { lodge?: Lodge }) {
+  function openNewBookingFromPrefill(prefillData: BookingPrefill) {
     setEditing(null);
     setPrefill(prefillData);
     setDialogOpen(true);
@@ -140,6 +161,21 @@ export default function Home() {
     setEditing(booking);
     setPrefill({});
     setDialogOpen(true);
+  }
+
+  /** Conferma dell'host sull'unità proposta per una prenotazione importata. */
+  function assignLodge(booking: Booking, lodge: Lodge) {
+    const { id, createdAt, updatedAt, proposedLodge, overbooking, ...rest } = booking;
+    void createdAt;
+    void updatedAt;
+    void proposedLodge;
+    void overbooking;
+    try {
+      updateBooking(id, { ...rest, lodge });
+      showToast(`${booking.guestName} assegnata a ${lodge}.`, "success");
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Assegnazione non riuscita.", "error");
+    }
   }
 
   function onImportClick() {
@@ -177,11 +213,27 @@ export default function Home() {
     URL.revokeObjectURL(url);
   }
 
-  function onCopyIcal() {
-    const url = `${window.location.origin}/api/calendar`;
-    navigator.clipboard.writeText(url).then(() => {
-      showToast("Link iCal copiato! Incollalo in Google Calendar / Airbnb / iPhone.", "success");
-    });
+  async function onCopyIcal() {
+    // Il token del feed vive solo lato server: chiediamo l'URL già composto.
+    try {
+      const headers: Record<string, string> = {};
+      const secret = process.env.NEXT_PUBLIC_API_WRITE_SECRET;
+      if (secret) headers["X-Internal-Token"] = secret;
+
+      const res = await fetch("/api/calendar/link", { headers, cache: "no-store" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = (await res.json()) as { url: string; protected: boolean };
+
+      await navigator.clipboard.writeText(data.url);
+      showToast(
+        data.protected
+          ? "Link iCal copiato. Incollalo nell'extranet Booking e nel pannello Airbnb."
+          : "Link iCal copiato, ma il feed è senza token: configura ICAL_FEED_TOKEN su Vercel.",
+        data.protected ? "success" : "error"
+      );
+    } catch {
+      showToast("Impossibile recuperare il link iCal.", "error");
+    }
   }
 
   const visibleSummary = useMemo(() => {
@@ -319,6 +371,7 @@ export default function Home() {
         onImportClick={onImportClick}
         onExport={onExport}
         onCopyIcal={onCopyIcal}
+        onDownloadPdf={() => setPdfDialogOpen(true)}
         onForceSync={() => forceSyncToCloud()}
         onChannelSync={() => runChannelSync()}
         onLogout={() => flushSyncToCloud()}
@@ -346,6 +399,7 @@ export default function Home() {
       <KPIPanel data={monthKPIs} monthLabel={format(monthDate, "MMMM yyyy")} />
 
       <ErrorBoundary>
+        <PendingAssignments bookings={bookings} onAssign={assignLodge} onOpen={openEditBooking} />
         <GanttBoard monthDays={monthDays} bookings={bookings} filters={filters} onCreate={openNewBooking} onEdit={openEditBooking} />
       </ErrorBoundary>
 
@@ -375,6 +429,15 @@ export default function Home() {
         onCreate={(payload: BookingInput) => addBooking(payload)}
         onUpdate={(id: string, payload: BookingInput) => updateBooking(id, payload)}
         onDelete={(id: string) => deleteBooking(id)}
+      />
+
+      <AvailabilityPdfDialog
+        open={pdfDialogOpen}
+        onClose={() => setPdfDialogOpen(false)}
+        bookings={bookings}
+        monthDate={monthDate}
+        taxSettings={taxSettings}
+        onSaveTaxSettings={saveTaxSettings}
       />
 
       <EmailImportDialog

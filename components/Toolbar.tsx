@@ -1,6 +1,6 @@
 "use client";
 
-import { Calendar, CloudUpload, Download, FileText, Mail, Plus, Printer, Upload } from "lucide-react";
+import { Calendar, CloudUpload, Download, FileDown, FileText, Mail, Plus, Printer, Upload } from "lucide-react";
 import { format } from "date-fns";
 import { FilterBar } from "@/components/FilterBar";
 import { MonthNavigation } from "@/components/MonthNavigation";
@@ -38,6 +38,7 @@ type ToolbarProps = {
   onImportClick: () => void;
   onExport: () => void;
   onCopyIcal: () => void;
+  onDownloadPdf: () => void;
   onForceSync: () => void;
   onChannelSync: () => void;
   onLogout?: () => Promise<unknown> | void;
@@ -74,6 +75,7 @@ export function Toolbar({
   onImportClick,
   onExport,
   onCopyIcal,
+  onDownloadPdf,
   onForceSync,
   onChannelSync,
   onLogout,
@@ -251,6 +253,15 @@ export function Toolbar({
               💾 Locale
             </span>
           )}
+          <button
+            type="button"
+            className="ghost-btn"
+            title="Genera il PDF disponibilità da inviare a chi fa i check-in"
+            onClick={onDownloadPdf}
+          >
+            <FileDown size={15} />
+            Scarica PDF
+          </button>
           <button type="button" className="ghost-btn" onClick={() => window.print()}>
             <Printer size={15} />
             Stampa
