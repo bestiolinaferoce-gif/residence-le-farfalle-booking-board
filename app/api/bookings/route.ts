@@ -1,28 +1,46 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { bookingWriteAuthError, kvNotConfiguredResponse } from '@/lib/bookingsApiAuth';
-import type { Booking } from '@/lib/types';
+import { NextRequest, NextResponse } from "next/server";
+import {
+  bookingReadAuthError,
+  bookingWriteAuthError,
+  identifyCaller,
+  kvNotConfiguredResponse,
+} from "@/lib/bookingsApiAuth";
+import type { Booking } from "@/lib/types";
+import {
+  capDeletedIds,
+  casWriteBookingsKV,
+  kvConfigured,
+  purgeExpiredTrash,
+  readBookingsKV,
+  type KVBookingsPayload,
+} from "@/lib/kvCas";
+import { appendAuditEntries, buildAuditEntries } from "@/lib/auditLog";
+import { validateBookingsPayload } from "@/lib/validation";
 import {
   notifyN8NBookingEvents,
   type N8nBookingEventName,
   type N8nBookingEventPayload,
-} from '@/lib/n8nBookingWebhook';
+} from "@/lib/n8nBookingWebhook";
 
-export const dynamic = 'force-dynamic';
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-const BASE = process.env.KV_REST_API_URL ?? '';
-const TOKEN = process.env.KV_REST_API_TOKEN ?? '';
-const KEY = 'lfb_bookings';
-
-type KVPayload = { v: number; ts: string; data: Booking[] };
-
-const PROPERTY = 'residence-le-farfalle';
+const NO_STORE = { "Cache-Control": "no-store, max-age=0" };
+const PROPERTY = "residence-le-farfalle";
+/** Tentativi di scrittura CAS prima di dichiarare il conflitto irrisolvibile. */
+const MAX_CAS_ATTEMPTS = 4;
 
 function calculateNights(checkIn: string, checkOut: string) {
-  const start = new Date(checkIn);
-  const end = new Date(checkOut);
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return 0;
-  return Math.max(0, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
+  const toUtc = (iso: string): number => {
+    const [y, m, d] = iso.slice(0, 10).split("-").map(Number);
+    if (!y || !m || !d) return NaN;
+    return Date.UTC(y, m - 1, d);
+  };
+  const start = toUtc(checkIn);
+  const end = toUtc(checkOut);
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return 0;
+  return Math.max(0, Math.round((end - start) / 86_400_000));
 }
 
 function toBookingEvent(event: N8nBookingEventName, booking: Booking): N8nBookingEventPayload {
@@ -31,8 +49,8 @@ function toBookingEvent(event: N8nBookingEventName, booking: Booking): N8nBookin
     bookingId: booking.id,
     property: PROPERTY,
     guestName: booking.guestName,
-    guestEmail: booking.guestProfile?.email ?? '',
-    guestPhone: booking.guestProfile?.phone ?? '',
+    guestEmail: booking.guestProfile?.email ?? "",
+    guestPhone: booking.guestProfile?.phone ?? "",
     checkin: booking.checkIn,
     checkout: booking.checkOut,
     nights: calculateNights(booking.checkIn, booking.checkOut),
@@ -42,12 +60,13 @@ function toBookingEvent(event: N8nBookingEventName, booking: Booking): N8nBookin
     depositAmount: booking.depositAmount,
     depositPaid: booking.depositReceived,
     notes: booking.notes,
-    source: 'booking-board',
+    source: "booking-board",
   };
 }
 
 function hasBookingChanged(previous: Booking, current: Booking) {
-  return previous.guestName !== current.guestName ||
+  return (
+    previous.guestName !== current.guestName ||
     previous.lodge !== current.lodge ||
     previous.checkIn !== current.checkIn ||
     previous.checkOut !== current.checkOut ||
@@ -57,7 +76,8 @@ function hasBookingChanged(previous: Booking, current: Booking) {
     previous.guestsCount !== current.guestsCount ||
     previous.totalAmount !== current.totalAmount ||
     previous.depositAmount !== current.depositAmount ||
-    previous.depositReceived !== current.depositReceived;
+    previous.depositReceived !== current.depositReceived
+  );
 }
 
 function collectBookingEvents(previousBookings: Booking[], nextBookings: Booking[]) {
@@ -68,83 +88,108 @@ function collectBookingEvents(previousBookings: Booking[], nextBookings: Booking
   for (const booking of nextBookings) {
     const previous = previousMap.get(booking.id);
     if (!previous) {
-      events.push(toBookingEvent('BOOKING_CREATED', booking));
+      events.push(toBookingEvent("BOOKING_CREATED", booking));
       continue;
     }
     if (!previous.depositReceived && booking.depositReceived) {
-      events.push(toBookingEvent('DEPOSIT_RECEIVED', booking));
+      events.push(toBookingEvent("DEPOSIT_RECEIVED", booking));
       continue;
     }
-    if (previous.status !== 'cancelled' && booking.status === 'cancelled') {
-      events.push(toBookingEvent('BOOKING_CANCELLED', booking));
+    if (previous.status !== "cancelled" && booking.status === "cancelled") {
+      events.push(toBookingEvent("BOOKING_CANCELLED", booking));
       continue;
     }
     if (hasBookingChanged(previous, booking)) {
-      events.push(toBookingEvent('BOOKING_MODIFIED', booking));
+      events.push(toBookingEvent("BOOKING_MODIFIED", booking));
     }
   }
 
   for (const booking of previousBookings) {
     if (!nextMap.has(booking.id)) {
-      events.push(toBookingEvent('BOOKING_CANCELLED', booking));
+      events.push(toBookingEvent("BOOKING_CANCELLED", booking));
     }
   }
 
   return events;
 }
 
-async function readKV(): Promise<{ payload: KVPayload | null; raw: string | null }> {
-  if (!BASE || !TOKEN) return { payload: null, raw: null };
-  const res = await fetch(`${BASE}/get/${KEY}`, {
-    headers: { Authorization: `Bearer ${TOKEN}` },
-    cache: 'no-store',
-  });
-  const json = (await res.json()) as { result: string | null };
-  if (!json.result) return { payload: null, raw: null };
-  const parsed = JSON.parse(json.result) as KVPayload | Booking[];
-  if (Array.isArray(parsed)) {
-    return { payload: { v: 1, ts: new Date().toISOString(), data: parsed }, raw: json.result };
-  }
-  return { payload: parsed as KVPayload, raw: json.result };
-}
+export async function GET(req: NextRequest) {
+  const authErr = bookingReadAuthError(req);
+  if (authErr) return authErr;
+  if (!kvConfigured()) return NextResponse.json({ v: 0, ts: "", data: [] }, { headers: NO_STORE });
 
-export async function GET() {
-  if (!BASE || !TOKEN) return NextResponse.json({ v: 0, ts: '', data: [] });
   try {
-    const { payload } = await readKV();
-    return NextResponse.json(payload ?? { v: 0, ts: '', data: [] }, {
-      headers: { 'Cache-Control': 'no-store, max-age=0' },
-    });
+    const payload = await readBookingsKV();
+    return NextResponse.json(payload ?? { v: 0, ts: "", data: [] }, { headers: NO_STORE });
   } catch {
-    return NextResponse.json({ v: 0, ts: '', data: [] }, {
-      headers: { 'Cache-Control': 'no-store, max-age=0' },
-    });
+    return NextResponse.json({ v: 0, ts: "", data: [] }, { headers: NO_STORE });
   }
 }
 
 export async function POST(req: NextRequest) {
   const authErr = bookingWriteAuthError(req);
   if (authErr) return authErr;
+  if (!kvConfigured()) return kvNotConfiguredResponse();
 
-  if (!BASE || !TOKEN) return kvNotConfiguredResponse();
+  const caller = identifyCaller(req);
+  const actor = caller?.role ?? "unknown";
+
+  let incoming: Booking[];
   try {
     const body = (await req.json()) as Booking[] | { bookings: Booking[] };
-    const bookings: Booking[] = Array.isArray(body) ? body : (body.bookings ?? []);
-    const { payload: current } = await readKV();
-    const events = collectBookingEvents(current?.data ?? [], bookings);
-    const newPayload: KVPayload = {
-      v: (current?.v ?? 0) + 1,
-      ts: new Date().toISOString(),
-      data: bookings,
-    };
-    await fetch(`${BASE}/pipeline`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify([['SET', KEY, JSON.stringify(newPayload)]]),
-    });
-    await notifyN8NBookingEvents(events, 'api/bookings');
-    return NextResponse.json({ ok: true, v: newPayload.v, ts: newPayload.ts, syncedEvents: events.length });
+    incoming = Array.isArray(body) ? body : (body.bookings ?? []);
   } catch {
-    return NextResponse.json({ ok: false }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "bad_request" }, { status: 400, headers: NO_STORE });
+  }
+
+  // Il form non è una barriera: quello che arriva qui va validato comunque.
+  const { errors, overbookings } = validateBookingsPayload(incoming);
+  if (errors.length > 0) {
+    return NextResponse.json(
+      { ok: false, error: "validation_failed", invalid: errors.slice(0, 20), invalidCount: errors.length },
+      { status: 422, headers: NO_STORE }
+    );
+  }
+
+  try {
+    for (let attempt = 1; attempt <= MAX_CAS_ATTEMPTS; attempt += 1) {
+      const current = await readBookingsKV();
+      const previous = current?.data ?? [];
+      const expectedVersion = current?.v ?? 0;
+
+      const { kept, purged } = purgeExpiredTrash(incoming);
+      const payload: KVBookingsPayload = {
+        v: expectedVersion + 1,
+        ts: new Date().toISOString(),
+        data: kept,
+        deletedIds: capDeletedIds([...(current?.deletedIds ?? []), ...purged.map((b) => b.id)]),
+      };
+
+      const written = await casWriteBookingsKV(expectedVersion, payload);
+      if (!written) continue; // qualcun altro ha scritto: rileggi e riprova
+
+      const events = collectBookingEvents(previous, kept);
+      await notifyN8NBookingEvents(events, "api/bookings");
+      await appendAuditEntries(buildAuditEntries(previous, kept, actor));
+
+      return NextResponse.json(
+        {
+          ok: true,
+          v: payload.v,
+          ts: payload.ts,
+          syncedEvents: events.length,
+          purged: purged.length,
+          overbookings,
+        },
+        { headers: NO_STORE }
+      );
+    }
+
+    return NextResponse.json(
+      { ok: false, error: "conflict", message: "Modifica concorrente in corso: ricarica e riprova." },
+      { status: 409, headers: NO_STORE }
+    );
+  } catch {
+    return NextResponse.json({ ok: false, error: "server_error" }, { status: 500, headers: NO_STORE });
   }
 }

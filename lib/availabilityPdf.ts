@@ -3,14 +3,13 @@
  * Vettoriale (jsPDF), non uno screenshot: resta nitido sullo zoom del telefono.
  */
 import { jsPDF } from "jspdf";
-import { PROPERTY_NAME } from "@/lib/config";
 import {
   computeTouristTax,
   formatTouristTax,
   isTouristTaxConfigured,
   type TouristTaxSettings,
 } from "@/lib/touristTax";
-import { LODGES, UNASSIGNED_LODGE, type Booking } from "@/lib/types";
+import { UNASSIGNED_LODGE, type Booking, type Lodge } from "@/lib/types";
 
 const MARGIN = 12;
 const LINE = 4.6;
@@ -45,13 +44,18 @@ export type AvailabilityPdfInput = {
   from: string;
   to: string;
   taxSettings: TouristTaxSettings;
+  /** Nome struttura e camere arrivano dalle Impostazioni, non dal codice. */
+  propertyName: string;
+  rooms: Array<{ id: Lodge; name: string }>;
 };
 
 export function availabilityPdfFilename(from: string, to: string): string {
   return `Le-Farfalle_Disponibilita_${from}_${to}.pdf`;
 }
 
-export function buildAvailabilityPdf({ bookings, from, to, taxSettings }: AvailabilityPdfInput): jsPDF {
+export function buildAvailabilityPdf({ bookings, from, to, taxSettings, propertyName, rooms }: AvailabilityPdfInput): jsPDF {
+  const LODGES = rooms.map((room) => room.id);
+  const labelOf = (id: string) => rooms.find((room) => room.id === id)?.name ?? id;
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
@@ -79,7 +83,7 @@ export function buildAvailabilityPdf({ bookings, from, to, taxSettings }: Availa
 
   // ── Intestazione ────────────────────────────────────────────────────────────
   doc.setFont("helvetica", "bold").setFontSize(16).setTextColor(20);
-  doc.text(`${PROPERTY_NAME} — Disponibilità`, MARGIN, y);
+  doc.text(`${propertyName} — Disponibilità`, MARGIN, y);
   y += 6;
   doc.setFont("helvetica", "normal").setFontSize(10).setTextColor(90);
   doc.text(`Periodo ${dayLabel(from)} → ${dayLabel(to)}   ·   generato il ${new Date().toLocaleString("it-IT")}`, MARGIN, y);
@@ -169,7 +173,7 @@ export function buildAvailabilityPdf({ bookings, from, to, taxSettings }: Availa
 
     for (const lodge of LODGES) {
       doc.setFont("helvetica", "bold").setFontSize(8).setTextColor(40);
-      doc.text(lodge, MARGIN, y + rowHeight / 2 + 1);
+      doc.text(labelOf(lodge), MARGIN, y + rowHeight / 2 + 1);
 
       chunk.forEach((day, i) => {
         const x = MARGIN + labelWidth + cellWidth * i;
@@ -259,7 +263,7 @@ export function buildAvailabilityPdf({ bookings, from, to, taxSettings }: Availa
   for (let page = 1; page <= pageCount; page += 1) {
     doc.setPage(page);
     doc.setFont("helvetica", "normal").setFontSize(8).setTextColor(150);
-    doc.text(`${PROPERTY_NAME} · pagina ${page} di ${pageCount}`, pageWidth / 2, pageHeight - 6, { align: "center" });
+    doc.text(`${propertyName} · pagina ${page} di ${pageCount}`, pageWidth / 2, pageHeight - 6, { align: "center" });
   }
 
   return doc;

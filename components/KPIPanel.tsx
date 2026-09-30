@@ -22,11 +22,16 @@ type CardDef = {
   badge?: (d: KPIData) => number | null;
 };
 
+/*
+ * Colori dal design system della struttura: corallo, mare, sabbia. L'unico
+ * colore "semantico" è quello dell'occupazione, che deve dire a colpo d'occhio
+ * se il mese sta andando bene.
+ */
 const CARDS: CardDef[] = [
   {
     icon: BedDouble,
-    iconColor: "#1d4ed8",
-    iconBg: "rgba(29,78,216,0.10)",
+    iconColor: "var(--accent)",
+    iconBg: "var(--accent-faint)",
     label: "Prenotazioni",
     getValue: (d) => String(d.bookingsCount),
     getSub: () => "Check-in nel mese",
@@ -34,16 +39,16 @@ const CARDS: CardDef[] = [
   },
   {
     icon: TrendingUp,
-    iconColor: "#16a34a",
-    iconBg: "rgba(22,163,74,0.10)",
+    iconColor: "var(--sea)",
+    iconBg: "rgba(42,157,143,0.12)",
     label: "Fatturato mese",
     getValue: (d) => formatMoney(d.revenue),
     getSub: () => "Totale incassabile",
   },
   {
     icon: Wallet,
-    iconColor: "#7c3aed",
-    iconBg: "rgba(124,58,237,0.10)",
+    iconColor: "var(--sand)",
+    iconBg: "rgba(233,196,106,0.12)",
     label: "Caparre ricevute",
     getValue: (d) => formatMoney(d.depositsReceived),
     getSub: () => "Già incassate",
@@ -51,16 +56,16 @@ const CARDS: CardDef[] = [
   {
     icon: BarChart3,
     iconColor: (d: KPIData) =>
-      d.occupancyPct >= 75 ? "#16a34a" : d.occupancyPct >= 40 ? "#d97706" : "#6b7280",
+      d.occupancyPct >= 75 ? "var(--sea)" : d.occupancyPct >= 40 ? "var(--sand)" : "var(--muted)",
     iconBg: (d: KPIData) =>
       d.occupancyPct >= 75
-        ? "rgba(22,163,74,0.10)"
+        ? "rgba(42,157,143,0.14)"
         : d.occupancyPct >= 40
-        ? "rgba(217,119,6,0.10)"
-        : "rgba(107,114,128,0.10)",
-    label: "Occupancy",
+        ? "rgba(233,196,106,0.14)"
+        : "rgba(255,255,255,0.06)",
+    label: "Occupazione",
     getValue: (d) => `${Math.round(d.occupancyPct)}%`,
-    getSub: () => "Lodge × notti mese",
+    getSub: () => "Camere × notti del mese",
   },
 ];
 
@@ -91,7 +96,8 @@ export function KPIPanel({ data, monthLabel }: Props) {
                 </span>
               )}
             </div>
-            <div className="kpi-value" style={{ color: iconColor }}>
+            {/* Il numero resta nel colore del testo: a colorarlo si perde gerarchia. */}
+            <div className="kpi-value">
               {card.getValue(data)}
             </div>
             <div className="kpi-sub">{card.getSub(data)}</div>

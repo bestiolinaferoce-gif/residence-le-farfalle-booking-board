@@ -14,8 +14,10 @@ import type { Booking, BookingFilters } from "@/lib/types";
 
 export const STORAGE_KEY = "le-farfalle-booking-board:v1";
 export const BACKUP_KEY = "le-farfalle-booking-board:backups:v1";
-export const TOURIST_TAX_KEY = "le-farfalle-booking-board:tourist-tax:v1";
-export const SETTINGS_KEY = "le-farfalle-booking-board:settings:v1";
+/** Preferenze UI locali (tema, versione vista): non sono dati di struttura. */
+export const SETTINGS_KEY = "le-farfalle-booking-board:ui:v1";
+/** Cache locale delle Impostazioni struttura (la fonte è KV). */
+export const SETTINGS_LOCAL_KEY = "le-farfalle-booking-board:board-settings:v1";
 export const DELETED_KEY = "le-farfalle-booking-board:deleted:v1";
 
 export const statusColors: Record<Booking["status"], string> = {
@@ -49,12 +51,12 @@ export const statusBadge: Record<Booking["status"], BadgeStyle> = {
   cancelled: { bg: "#fef2f2", text: "#dc2626", border: "#fecaca" },
 };
 
-export const LODGE_COLORS_MAP: Record<string, string> = {
-  Limone: "#7c3aed",
-  Macaone: "#a855f7",
-  Vanessa: "#c084fc",
-  Aurora: "#6d28d9",
-};
+/**
+ * Colori di ripiego per le camere. I colori veri vengono dalle Impostazioni
+ * (`lib/rooms.ts`): questa mappa serve solo a contesti non-React (PDF, export)
+ * che ricevono la config camere come parametro e possono trovarla assente.
+ */
+export const FALLBACK_ROOM_COLOR = "#e2725b";
 
 export const channelBadge: Record<Booking["channel"], BadgeStyle> = {
   direct:   { bg: "#eff6ff", text: "#1d4ed8", border: "#bfdbfe" },

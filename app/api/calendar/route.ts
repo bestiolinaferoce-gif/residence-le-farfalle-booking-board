@@ -72,6 +72,8 @@ export async function GET(req: NextRequest) {
     // Non ancora assegnate a un'unità: annunciarle come occupate bloccherebbe
     // inventario che potrebbe non esistere. Restano fuori finché l'host non conferma.
     if (b.lodge === UNASSIGNED_LODGE) return false;
+    // Nel cestino: la camera è di nuovo libera.
+    if (b.deletedAt) return false;
     return b.status !== 'cancelled';
   });
 

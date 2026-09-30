@@ -5,7 +5,39 @@ import { differenceInDays, parseISO } from "date-fns";
 import { X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { BOOKING_CHANNELS, BOOKING_STATUSES, LODGES, type Booking, type BookingInput, type BookingStatus, type GuestProfile, type Lodge } from "@/lib/types";
+import {
+  BOOKING_CHANNELS,
+  BOOKING_STATUSES,
+  LODGES,
+  PAYMENT_METHODS,
+  PAYMENT_METHOD_LABELS,
+  type Booking,
+  type BookingInput,
+  type BookingStatus,
+  type GuestProfile,
+  type Lodge,
+  type PaymentMethod,
+} from "@/lib/types";
+import { useActiveRoomIds, useRoomLabel, useSettingsStore } from "@/lib/settingsStore";
+import { roomCapacity } from "@/lib/rooms";
+import { seasonForDate, suggestedTotal } from "@/lib/settings";
+import { computeTouristTax, formatTouristTax } from "@/lib/touristTax";
+import { validateBookingShape } from "@/lib/validation";
+
+const CHANNEL_LABELS: Record<string, string> = {
+  direct: "Diretta",
+  booking: "Booking.com",
+  airbnb: "Airbnb",
+  expedia: "Expedia",
+  other: "Altro",
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  confirmed: "Confermata",
+  option: "Opzione",
+  blocked: "Bloccata",
+  cancelled: "Cancellata",
+};
 
 type BookingDialogProps = {
   open: boolean;
@@ -26,6 +58,7 @@ function buildDefault(lodge?: Lodge, day?: string): FormState {
   return {
     guestName: "",
     lodge: lodge || LODGES[0],
+    paymentMethod: "bonifico",
     checkIn,
     checkOut: new Date(new Date(checkIn).setDate(new Date(checkIn).getDate() + 1)).toISOString().slice(0, 10),
     status: "confirmed",
@@ -54,6 +87,9 @@ export function BookingDialog({
   onDelete,
 }: BookingDialogProps) {
   const mode = booking ? "edit" : "create";
+  const roomIds = useActiveRoomIds();
+  const roomLabel = useRoomLabel();
+  const settings = useSettingsStore((s) => s.settings);
   const [form, setForm] = useState<FormState>(buildDefault(initialLodge, initialDate));
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof FormState, string>>>({});
@@ -89,6 +125,9 @@ export function BookingDialog({
         depositAmount: booking.depositAmount,
         depositReceived: booking.depositReceived,
         guestProfile: booking.guestProfile,
+        paymentMethod: booking.paymentMethod ?? "bonifico",
+        balancePaid: booking.balancePaid ?? false,
+        reporting: booking.reporting,
         checkInTime: booking.checkInTime ?? "14:00",
         checkOutTime: booking.checkOutTime ?? "10:00",
         breakfastIncluded: booking.breakfastIncluded ?? true,
@@ -179,6 +218,17 @@ export function BookingDialog({
   function submit() {
     setFieldErrors({});
     setError("");
+
+    const capacity = roomCapacity(settings.rooms, form.lodge);
+    const issues = validateBookingShape(form, { capacity });
+    if (issues.length > 0) {
+      const map: Partial<Record<keyof FormState, string>> = {};
+      for (const issue of issues) map[issue.field as keyof FormState] = issue.message;
+      setFieldErrors(map);
+      setError(issues.length > 1 ? `${issues.length} campi da correggere.` : "");
+      return;
+    }
+
     try {
       if (mode === "edit" && booking) {
         onUpdate(booking.id, form);
@@ -196,6 +246,33 @@ export function BookingDialog({
       }
     }
   }
+
+  const nights = useMemo(() => {
+    try {
+      return Math.max(0, differenceInDays(parseISO(form.checkOut), parseISO(form.checkIn)));
+    } catch {
+      return 0;
+    }
+  }, [form.checkIn, form.checkOut]);
+
+  const priceHint = useMemo(
+    () => suggestedTotal(settings.seasons, form.checkIn, nights),
+    [settings.seasons, form.checkIn, nights]
+  );
+  const seasonName = useMemo(
+    () => seasonForDate(settings.seasons, form.checkIn)?.label ?? null,
+    [settings.seasons, form.checkIn]
+  );
+
+  const taxLabel = useMemo(() => {
+    const draft = {
+      ...form,
+      id: booking?.id ?? "draft",
+      createdAt: booking?.createdAt ?? "",
+      updatedAt: booking?.updatedAt ?? "",
+    } as Booking;
+    return formatTouristTax(computeTouristTax(draft, settings.touristTax));
+  }, [form, booking, settings.touristTax]);
 
   function change<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => {
@@ -234,9 +311,9 @@ export function BookingDialog({
                   <input value={form.guestName} onChange={(e) => change("guestName", e.target.value)} placeholder="Nome e cognome" />
                   {fieldErrors.guestName && <span className="field-error">{fieldErrors.guestName}</span>}
                 </label>
-                <label>Lodge
+                <label>Camera
                   <select value={form.lodge} onChange={(e) => change("lodge", e.target.value as Lodge)}>
-                    {LODGES.map((l) => <option key={l} value={l}>{l}</option>)}
+                    {roomIds.map((l) => <option key={l} value={l}>{roomLabel(l)}</option>)}
                   </select>
                 </label>
                 <label>
@@ -250,7 +327,7 @@ export function BookingDialog({
                 </label>
                 <label>Canale
                   <select value={form.channel} onChange={(e) => change("channel", e.target.value as BookingInput["channel"])}>
-                    {BOOKING_CHANNELS.map((c) => <option key={c} value={c}>{c}</option>)}
+                    {BOOKING_CHANNELS.map((c) => <option key={c} value={c}>{CHANNEL_LABELS[c] ?? c}</option>)}
                   </select>
                 </label>
                 <label className="checkbox-line">
@@ -272,7 +349,7 @@ export function BookingDialog({
                 </label>
                 <label>Stato
                   <select value={form.status} onChange={(e) => change("status", e.target.value as BookingStatus)}>
-                    {BOOKING_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+                    {BOOKING_STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABELS[s] ?? s}</option>)}
                   </select>
                 </label>
                 <label>Orario check-in
@@ -288,6 +365,27 @@ export function BookingDialog({
               <div className="form-grid">
                 <label>Totale
                   <input type="number" min={0} value={form.totalAmount} onChange={(e) => change("totalAmount", Number(e.target.value || 0))} />
+                  {fieldErrors.totalAmount && <span className="field-error">{fieldErrors.totalAmount}</span>}
+                  {priceHint !== null && form.totalAmount !== priceHint ? (
+                    <button
+                      type="button"
+                      className="ghost-btn"
+                      style={{ marginTop: 6, fontSize: "0.8rem", padding: "6px 10px" }}
+                      onClick={() => change("totalAmount", priceHint)}
+                    >
+                      Applica listino{seasonName ? ` ${seasonName.toLowerCase()}` : ""}: € {priceHint.toFixed(0)} ({nights}n)
+                    </button>
+                  ) : null}
+                </label>
+                <label>Metodo di pagamento
+                  <select
+                    value={form.paymentMethod ?? "bonifico"}
+                    onChange={(e) => change("paymentMethod", e.target.value as PaymentMethod)}
+                  >
+                    {PAYMENT_METHODS.map((m) => (
+                      <option key={m} value={m}>{PAYMENT_METHOD_LABELS[m]}</option>
+                    ))}
+                  </select>
                 </label>
                 <label>Caparra
                   <input type="number" min={0} value={form.depositAmount} onChange={(e) => change("depositAmount", Number(e.target.value || 0))} />
@@ -297,9 +395,51 @@ export function BookingDialog({
                   <input type="checkbox" checked={form.depositReceived} onChange={(e) => change("depositReceived", e.target.checked)} />
                   Caparra ricevuta
                 </label>
+                <label className="checkbox-line">
+                  <input type="checkbox" checked={form.balancePaid ?? false} onChange={(e) => change("balancePaid", e.target.checked)} />
+                  Saldo incassato
+                </label>
                 <label>
                   Residuo da incassare
                   <input readOnly value={`€ ${Math.max(0, form.totalAmount - form.depositAmount).toFixed(2)}`} style={{ background: "var(--bg)", color: "var(--muted)", cursor: "default" }} />
+                </label>
+                <label>
+                  Imposta di soggiorno
+                  {/* "DA VERIFICARE" finché il Comune non è configurato: mai una cifra inventata. */}
+                  <input readOnly value={taxLabel} style={{ background: "var(--bg)", color: "var(--muted)", cursor: "default" }} />
+                </label>
+              </div>
+            </div>
+            <div className="form-section">
+              <p className="form-section-title">Adempimenti</p>
+              <div className="form-grid">
+                <label className="checkbox-line">
+                  <input
+                    type="checkbox"
+                    checked={form.reporting?.alloggiatiSent ?? false}
+                    onChange={(e) =>
+                      change("reporting", {
+                        ...(form.reporting ?? {}),
+                        alloggiatiSent: e.target.checked,
+                        alloggiatiSentAt: e.target.checked ? new Date().toISOString() : undefined,
+                      })
+                    }
+                  />
+                  Schedina Alloggiati inviata
+                </label>
+                <label className="checkbox-line">
+                  <input
+                    type="checkbox"
+                    checked={form.reporting?.ross1000Sent ?? false}
+                    onChange={(e) =>
+                      change("reporting", {
+                        ...(form.reporting ?? {}),
+                        ross1000Sent: e.target.checked,
+                        ross1000SentAt: e.target.checked ? new Date().toISOString() : undefined,
+                      })
+                    }
+                  />
+                  Flusso ROSS1000 comunicato
                 </label>
               </div>
             </div>
@@ -382,8 +522,12 @@ export function BookingDialog({
     <ConfirmDialog
       open={deleteConfirm}
       title="Elimina prenotazione"
-      message={booking ? `Vuoi eliminare la prenotazione di ${booking.guestName}? L'azione è irreversibile.` : ""}
-      confirmLabel="Elimina"
+      message={
+        booking
+          ? `Sposti nel cestino la prenotazione di ${booking.guestName}? Resta ripristinabile per 30 giorni.`
+          : ""
+      }
+      confirmLabel="Sposta nel cestino"
       onConfirm={() => {
         if (booking) {
           onDelete(booking.id);

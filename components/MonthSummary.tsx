@@ -1,9 +1,10 @@
 "use client";
 
 import { addDays, differenceInDays, endOfMonth, format, parseISO, startOfMonth } from "date-fns";
+import { it } from "date-fns/locale";
 import type { Booking, Lodge } from "@/lib/types";
-import { LODGES } from "@/lib/types";
-import { LODGE_COLORS_MAP, formatMoney } from "@/lib/utils";
+import { formatMoney } from "@/lib/utils";
+import { useActiveRoomIds, useRoomColor, useRoomLabel } from "@/lib/settingsStore";
 
 export type LodgeSummary = {
   lodge: Lodge;
@@ -37,15 +38,17 @@ function revenueInMonth(booking: Booking, monthStart: Date, monthEnd: Date): num
   return (booking.totalAmount / totalNights) * nights;
 }
 
+/** `rooms` sono le sole camere attive: le altre non entrano nell'occupazione. */
 export function computeLodgeSummaries(
   monthDate: Date,
-  bookings: Booking[]
+  bookings: Booking[],
+  rooms: readonly Lodge[]
 ): LodgeSummary[] {
   const monthStart = startOfMonth(monthDate);
   const monthEnd = endOfMonth(monthDate);
   const totalDays = differenceInDays(addDays(monthEnd, 1), monthStart);
 
-  return LODGES.map((lodge) => {
+  return rooms.map((lodge) => {
     const lodgeBookings = bookings.filter(
       (b) => b.lodge === lodge && b.status !== "cancelled" && isActiveInMonth(b, monthStart, monthEnd)
     );
@@ -69,10 +72,13 @@ type MonthSummaryProps = {
 };
 
 export function MonthSummary({ monthDate, lodgeSummaries }: MonthSummaryProps) {
+  const roomIds = useActiveRoomIds();
+  const roomLabel = useRoomLabel();
+  const roomColor = useRoomColor();
   const totalNotti = lodgeSummaries.reduce((acc, s) => acc + s.nightsBooked, 0);
   const totalRevenue = lodgeSummaries.reduce((acc, s) => acc + s.revenue, 0);
   const totalDays = differenceInDays(addDays(endOfMonth(monthDate), 1), startOfMonth(monthDate));
-  const avgOccupancy = totalDays > 0 ? (totalNotti / (totalDays * LODGES.length)) * 100 : 0;
+  const avgOccupancy = totalDays > 0 ? (totalNotti / (totalDays * Math.max(roomIds.length, 1))) * 100 : 0;
 
   if (lodgeSummaries.every((s) => s.bookingsCount === 0)) {
     return null;
@@ -81,15 +87,15 @@ export function MonthSummary({ monthDate, lodgeSummaries }: MonthSummaryProps) {
   return (
     <section className="month-summary no-print">
       <h3 className="month-summary-title">
-        Riepilogo {format(monthDate, "MMMM yyyy")} — {totalNotti} notti occupate / {totalDays} giorni · Occupancy media {avgOccupancy.toFixed(0)}%
+        Riepilogo {format(monthDate, "MMMM yyyy", { locale: it })} — {totalNotti} notti occupate / {totalDays} giorni · Occupazione media {avgOccupancy.toFixed(0)}%
       </h3>
       <table className="summary-table">
         <thead>
           <tr>
-            <th>Lodge</th>
+            <th>Camera</th>
             <th>Prenotazioni</th>
             <th>Notti</th>
-            <th>Occupancy %</th>
+            <th>Occupazione %</th>
             <th>Fatturato</th>
           </tr>
         </thead>
@@ -103,12 +109,12 @@ export function MonthSummary({ monthDate, lodgeSummaries }: MonthSummaryProps) {
                       width: 8,
                       height: 8,
                       borderRadius: "50%",
-                      background: LODGE_COLORS_MAP[s.lodge] ?? "#888",
+                      background: roomColor(s.lodge),
                       display: "inline-block",
                       flexShrink: 0,
                     }}
                   />
-                  {s.lodge}
+                  {roomLabel(s.lodge)}
                 </span>
               </td>
               <td>{s.bookingsCount}</td>
@@ -116,7 +122,7 @@ export function MonthSummary({ monthDate, lodgeSummaries }: MonthSummaryProps) {
               <td>
                 <span>{s.occupancyPct.toFixed(0)}%</span>
                 <div className="occ-bar">
-                  <div className="occ-bar-fill" style={{ width: `${Math.min(s.occupancyPct, 100)}%`, background: LODGE_COLORS_MAP[s.lodge] ?? "var(--accent)" }} />
+                  <div className="occ-bar-fill" style={{ width: `${Math.min(s.occupancyPct, 100)}%`, background: roomColor(s.lodge) }} />
                 </div>
               </td>
               <td>{formatMoney(s.revenue)}</td>

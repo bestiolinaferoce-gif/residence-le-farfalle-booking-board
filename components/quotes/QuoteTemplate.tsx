@@ -152,7 +152,7 @@ function CompareRow({ lodge }: { lodge: QuoteLodge }) {
 function SheetRunning({ page, quoteNumber }: { page: string; quoteNumber: string }) {
   return (
     <div className="qt-sheet-running">
-      <span>Residence Le Farfalle — {quoteDocument.docTitle}</span>
+      <span>{residenceContact.name} — {quoteDocument.docTitle}</span>
       <span>Rif. {quoteNumber} · pag. {page}</span>
     </div>
   );

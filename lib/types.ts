@@ -1,3 +1,9 @@
+/**
+ * Camere di Residence Le Farfalle: identificativi tecnici, stabili per sempre.
+ * Sono scritti dentro ogni prenotazione salvata e negli URL dei feed iCal
+ * consegnati alle OTA: non vanno mai rinominati. Il nome mostrato si cambia
+ * dalle Impostazioni (vedi `lib/rooms.ts`).
+ */
 export const LODGES = [
   "Limone",
   "Macaone",
@@ -99,7 +105,53 @@ export type Booking = {
   externalSyncKey?: string;
   externalCalendarName?: string;
   externalLastSeenAt?: string;
+  /** Metodo di pagamento concordato (bonifico, contanti, carta, OTA…). */
+  paymentMethod?: PaymentMethod;
+  /** Saldo residuo incassato. Assente = non ancora saldato. */
+  balancePaid?: boolean;
+  /** Adempimenti di legge: schedina Alloggiati Web e flusso ROSS1000. */
+  reporting?: ReportingStatus;
+  /**
+   * Cestino: data di eliminazione. La prenotazione resta nei dati per 30 giorni
+   * ed è ripristinabile; sparisce da board, KPI, iCal ed export.
+   */
+  deletedAt?: string;
 };
+
+export const PAYMENT_METHODS = ["bonifico", "contanti", "carta", "ota", "altro"] as const;
+export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
+
+export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
+  bonifico: "Bonifico",
+  contanti: "Contanti",
+  carta: "Carta / POS",
+  ota: "Incassato dal portale",
+  altro: "Altro",
+};
+
+/**
+ * Stato degli adempimenti per singola prenotazione. Le date sono dichiarate
+ * dall'host: l'app non invia nulla ai portali, li apre e tiene il conto.
+ */
+export type ReportingStatus = {
+  alloggiatiSent?: boolean;
+  alloggiatiSentAt?: string;
+  ross1000Sent?: boolean;
+  ross1000SentAt?: string;
+  notes?: string;
+};
+
+/** Giorni di permanenza nel cestino prima dell'eliminazione definitiva. */
+export const TRASH_RETENTION_DAYS = 30;
+
+export function isTrashed(booking: Booking): boolean {
+  return Boolean(booking.deletedAt);
+}
+
+/** Prenotazioni vive: tutto ciò che non è nel cestino. */
+export function activeBookings(bookings: Booking[]): Booking[] {
+  return bookings.filter((b) => !b.deletedAt);
+}
 
 export type BookingInput = Omit<Booking, "id" | "createdAt" | "updatedAt">;
 

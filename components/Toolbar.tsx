@@ -2,21 +2,20 @@
 
 import { Calendar, CloudUpload, Download, FileDown, FileText, Mail, Plus, Printer, Upload } from "lucide-react";
 import { format } from "date-fns";
+import { it } from "date-fns/locale";
 import { FilterBar } from "@/components/FilterBar";
 import { MonthNavigation } from "@/components/MonthNavigation";
 import { SummaryBar } from "@/components/SummaryBar";
-import { LiveClock } from "@/components/LiveClock";
-import { WeatherWidget } from "@/components/WeatherWidget";
 import type { BookingFilters } from "@/lib/types";
 
+/** Palette della board (design system Corallo): corallo, mare, sabbia. */
 const ACCENT_PRESETS = [
-  "#7c3aed", // viola (default)
-  "#2563eb", // blu
-  "#0d9488", // teal
-  "#16a34a", // verde
-  "#d97706", // ambra
-  "#dc2626", // rosso
-  "#db2777", // rosa
+  "#ff7a5a", // corallo (default)
+  "#e2725b", // corallo profondo
+  "#2a9d8f", // mare
+  "#2a7d8c", // mare profondo
+  "#e9c46a", // sabbia
+  "#d1495b", // rosso scoglio
 ];
 
 type ToolbarProps = {
@@ -41,7 +40,6 @@ type ToolbarProps = {
   onDownloadPdf: () => void;
   onForceSync: () => void;
   onChannelSync: () => void;
-  onLogout?: () => Promise<unknown> | void;
   onSyncLocal?: () => void;
   syncError: boolean;
   hasNewBookings?: boolean;
@@ -50,8 +48,6 @@ type ToolbarProps = {
   visibleCount: number;
   visibleTotal: number;
   visibleDeposits: number;
-  darkMode: boolean;
-  onToggleDarkMode: () => void;
   accentColor: string;
   onSetAccentColor: (c: string) => void;
 };
@@ -78,7 +74,6 @@ export function Toolbar({
   onDownloadPdf,
   onForceSync,
   onChannelSync,
-  onLogout,
   onSyncLocal,
   syncError,
   hasNewBookings = false,
@@ -87,79 +82,25 @@ export function Toolbar({
   visibleTotal,
   visibleDeposits,
   newBookingsCount = 0,
-  darkMode,
-  onToggleDarkMode,
   accentColor,
   onSetAccentColor,
 }: ToolbarProps) {
-  async function handleLogout() {
-    try {
-      await onLogout?.();
-    } finally {
-      sessionStorage.removeItem("le-farfalle:auth");
-      window.location.reload();
-    }
-  }
-
   return (
     <section className="toolbar no-print">
-      {/* Top row: brand + meta */}
-      <div className="header-top">
-        <div className="header-brand">
-          <span className="header-icon">🦋</span>
-          <h1>Residence Le Farfalle — Booking Board</h1>
+      <div className="toolbar-month-row">
+        <span className="toolbar-month">{format(monthDate, "MMMM yyyy", { locale: it })}</span>
+        <div className="accent-picker" title="Colore accento">
+          {ACCENT_PRESETS.map((c) => (
+            <button
+              key={c}
+              type="button"
+              className={`accent-swatch${accentColor === c ? " active" : ""}`}
+              style={{ background: c }}
+              aria-label={`Accento ${c}`}
+              onClick={() => onSetAccentColor(c)}
+            />
+          ))}
         </div>
-        <div className="header-right">
-          <WeatherWidget />
-          <LiveClock />
-          <div className="accent-picker" title="Colore accento">
-            {ACCENT_PRESETS.map((c) => (
-              <button
-                key={c}
-                type="button"
-                className={`accent-swatch${accentColor === c ? " active" : ""}`}
-                style={{ background: c }}
-                title={c}
-                onClick={() => onSetAccentColor(c)}
-              />
-            ))}
-          </div>
-          <button
-            type="button"
-            className="dark-toggle-btn"
-            title={darkMode ? "Passa a tema chiaro" : "Passa a tema scuro"}
-            onClick={onToggleDarkMode}
-          >
-            {darkMode ? "☀️" : "🌙"}
-          </button>
-          <a
-            href="https://www.residencelefarfalle.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="header-site-link"
-          >
-            → residencelefarfalle.com
-          </a>
-          <button type="button" className="header-logout-btn" onClick={handleLogout}>
-            Logout
-          </button>
-        </div>
-      </div>
-
-      {/* Month display badge */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <span style={{
-          color: "var(--muted)",
-          textTransform: "capitalize",
-          background: "var(--accent-faint)",
-          border: "1px solid var(--line)",
-          borderRadius: 8,
-          padding: "3px 10px",
-          fontSize: "0.9rem",
-          fontWeight: 500,
-        }}>
-          {format(monthDate, "MMMM yyyy")}
-        </span>
       </div>
 
       <div className="controls-row">
@@ -195,7 +136,7 @@ export function Toolbar({
           </button>
           <button type="button" className="ghost-btn" onClick={onExport}>
             <Download size={15} />
-            Export JSON
+            Backup
           </button>
           <button
             type="button"

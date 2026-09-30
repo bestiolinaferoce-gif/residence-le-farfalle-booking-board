@@ -49,7 +49,12 @@ type BookingState = {
   setShowCancelled: (value: boolean) => void;
   addBooking: (payload: BookingInput) => Booking;
   updateBooking: (id: string, payload: BookingInput) => Booking;
+  /** Sposta nel cestino: recuperabile per 30 giorni. */
   deleteBooking: (id: string) => void;
+  /** Ripristina dal cestino. */
+  restoreBooking: (id: string) => void;
+  /** Elimina definitivamente una prenotazione già nel cestino. */
+  purgeBooking: (id: string) => void;
   importBookingsMerge: (incoming: Booking[]) => {
     merged: number;
     skipped: number;
@@ -153,6 +158,10 @@ function ensureNoOverlap(bookings: Booking[], payload: BookingInput, excludeId?:
     if (excludeId && booking.id === excludeId) {
       return false;
     }
+    // Una prenotazione nel cestino non occupa più la camera.
+    if (booking.deletedAt) {
+      return false;
+    }
     if (
       booking.dataOrigin === "sync" &&
       payload.dataOrigin === "sync" &&
@@ -200,13 +209,13 @@ function migrateBookings(arr: Array<Booking & { guestsCount?: number }>): Bookin
   });
 }
 
+/**
+ * Le scritture dal browser si autenticano col cookie di sessione (httpOnly).
+ * Nessun segreto nel bundle client: un NEXT_PUBLIC_* finirebbe nel JavaScript
+ * scaricabile da chiunque.
+ */
 function internalPostBookingsHeaders(): HeadersInit {
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  const token = process.env.NEXT_PUBLIC_API_WRITE_SECRET;
-  if (typeof token === "string" && token.length > 0) {
-    headers["X-Internal-Token"] = token;
-  }
-  return headers;
+  return { "Content-Type": "application/json" };
 }
 
 function readBackupSnapshotsFromLocal(): BackupSnapshot[] {
@@ -370,7 +379,7 @@ export const useBookingStore = create<BookingState>((set, get) => {
     },
     monthTheme: true,
     darkMode: true,
-    accentColor: "#7c3aed",
+    accentColor: "#ff7a5a",
     toast: null,
     serverVersion: 0,
     syncError: false,
@@ -457,11 +466,45 @@ export const useBookingStore = create<BookingState>((set, get) => {
         })
         .catch(() => set({ syncError: true }));
     },
+    /**
+     * Polling consapevole della scheda.
+     *
+     * Prima interrogava il server ogni 30 secondi per sempre: una scheda
+     * dimenticata aperta sul telefono bruciava ~86.000 letture al mese senza
+     * che nessuno la guardasse. Ora la scheda in secondo piano non interroga
+     * affatto e si riallinea appena torna in primo piano, e dopo un'ora senza
+     * cambiamenti il ritmo rallenta. Stessa reattività per chi sta lavorando,
+     * consumi di un ordine di grandezza più bassi.
+     */
     startPolling: () => {
-      const INTERVAL = 30_000;
+      const ACTIVE_INTERVAL = 30_000;
+      const IDLE_INTERVAL = 120_000;
+      /** Dopo quanto tempo senza modifiche si considera la board "ferma". */
+      const IDLE_AFTER_MS = 60 * 60_000;
+
       let active = true;
+      let timer: ReturnType<typeof setTimeout> | null = null;
+      let lastChangeAt = Date.now();
+
+      function currentInterval(): number {
+        return Date.now() - lastChangeAt > IDLE_AFTER_MS ? IDLE_INTERVAL : ACTIVE_INTERVAL;
+      }
+
+      function schedule(delay: number) {
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(poll, delay);
+      }
+
       const poll = async () => {
         if (!active || typeof window === "undefined") return;
+
+        // Scheda nascosta: nessuna interrogazione. Il riallineamento avviene
+        // al ritorno in primo piano, che è l'unico momento in cui serve.
+        if (document.visibilityState === "hidden") {
+          schedule(currentInterval());
+          return;
+        }
+
         try {
           const res = await fetch("/api/bookings/version", { cache: "no-store" });
           if (!res.ok) throw new Error("poll failed");
@@ -479,6 +522,7 @@ export const useBookingStore = create<BookingState>((set, get) => {
             const migrated = migrateBookings(data as Array<Booking & { guestsCount?: number }>);
             const localRows = get().bookings;
             const combined = mergeKvWithLocal(migrated, localRows, get().deletedIds);
+            lastChangeAt = Date.now();
             set({ bookings: combined, serverVersion: newV, syncError: false, hasNewBookings: true });
             if (typeof window !== "undefined") {
               window.localStorage.setItem(STORAGE_KEY, JSON.stringify(combined));
@@ -491,12 +535,23 @@ export const useBookingStore = create<BookingState>((set, get) => {
         } catch {
           set({ syncError: true });
         }
-        if (active) setTimeout(poll, INTERVAL);
+        if (active) schedule(currentInterval());
       };
-      const firstTimer = setTimeout(poll, 5_000);
+
+      // Ritorno in primo piano: allineamento immediato, non al prossimo giro.
+      function onVisibility() {
+        if (document.visibilityState === "visible") {
+          lastChangeAt = Date.now();
+          schedule(0);
+        }
+      }
+      document.addEventListener("visibilitychange", onVisibility);
+
+      schedule(5_000);
       return () => {
         active = false;
-        clearTimeout(firstTimer);
+        if (timer) clearTimeout(timer);
+        document.removeEventListener("visibilitychange", onVisibility);
       };
     },
     stopPolling: () => { /* gestito dall'active flag nel cleanup di startPolling */ },
@@ -580,7 +635,29 @@ export const useBookingStore = create<BookingState>((set, get) => {
       persist(next);
       return updated;
     },
+    /**
+     * Cestino invece di cancellazione: una prenotazione eliminata per sbaglio
+     * dal telefono, in mezzo al servizio, altrimenti sarebbe persa per sempre.
+     * Il record resta nei dati con `deletedAt` e sparisce da board, KPI ed iCal;
+     * il server lo elimina davvero dopo 30 giorni.
+     */
     deleteBooking: (id) => {
+      const now = new Date().toISOString();
+      const next = get().bookings.map((booking) =>
+        booking.id === id ? { ...booking, deletedAt: now, updatedAt: now } : booking
+      );
+      set({ bookings: next });
+      persist(next);
+    },
+    restoreBooking: (id) => {
+      const now = new Date().toISOString();
+      const next = get().bookings.map((booking) =>
+        booking.id === id ? { ...booking, deletedAt: undefined, updatedAt: now } : booking
+      );
+      set({ bookings: next });
+      persist(next);
+    },
+    purgeBooking: (id) => {
       const next = get().bookings.filter((booking) => booking.id !== id);
       const newDeletedIds = new Set([...get().deletedIds, id]);
       set({ bookings: next, deletedIds: newDeletedIds });

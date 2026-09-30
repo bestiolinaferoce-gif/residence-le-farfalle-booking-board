@@ -9,17 +9,22 @@ import {
   parseISO,
   startOfDay,
 } from "date-fns";
-import { useMemo } from "react";
+import { it } from "date-fns/locale";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Booking, BookingFilters, BookingLodge, Lodge } from "@/lib/types";
-import { LODGES, UNASSIGNED_LODGE } from "@/lib/types";
+import { UNASSIGNED_LODGE } from "@/lib/types";
+import { useActiveRoomIds, useRoomColor, useRoomLabel } from "@/lib/settingsStore";
+import { detectOverbookings } from "@/lib/validation";
+import { useBookingDrag, type DragState, type DropResult } from "@/lib/useBookingDrag";
 
 // Colori celle basati su canale (Task spec)
+/** Barre: un colore per canale, leggibile su fondo scuro come su carta. */
 const CHANNEL_BAR_COLORS: Record<string, { bg: string; text: string }> = {
-  airbnb: { bg: "#fda4af", text: "#9f1239" },
-  direct: { bg: "#6ee7b7", text: "#065f46" },
-  booking: { bg: "#93c5fd", text: "#1e3a8a" },
-  expedia: { bg: "#fcd34d", text: "#78350f" },
-  other: { bg: "#d1d5db", text: "#374151" },
+  direct: { bg: "linear-gradient(135deg, #ffb199, #e2725b)", text: "#3a1108" },
+  booking: { bg: "linear-gradient(135deg, #7fc7d9, #2a7d8c)", text: "#06222a" },
+  airbnb: { bg: "linear-gradient(135deg, #ff9aa8, #d1495b)", text: "#3d0912" },
+  expedia: { bg: "linear-gradient(135deg, #f2d492, #e9c46a)", text: "#3d2f06" },
+  other: { bg: "linear-gradient(135deg, #b9c6c9, #8ea3a8)", text: "#1d2b2f" },
 };
 
 const STATUS_BAR_OVERRIDES: Partial<Record<string, { bg: string; text: string }>> = {
@@ -36,13 +41,8 @@ function barColors(channel: string, status: string): { bg: string; text: string 
   );
 }
 
-const LODGE_COLORS: Record<BookingLodge, { dot: string }> = {
-  [UNASSIGNED_LODGE]: { dot: "#f59e0b" },
-  Limone:  { dot: "#7c3aed" },
-  Macaone: { dot: "#a855f7" },
-  Vanessa: { dot: "#c084fc" },
-  Aurora:  { dot: "#6d28d9" },
-};
+/** La corsia "Da assegnare" non è una camera: colore fisso, non configurabile. */
+const UNASSIGNED_DOT = "#e9c46a";
 
 type CellInfo = { booking: Booking; isFirst: boolean; span: number };
 
@@ -89,6 +89,19 @@ type GanttBoardProps = {
   filters: BookingFilters;
   onCreate: (lodge: Lodge, day: Date) => void;
   onEdit: (booking: Booking) => void;
+  /** Spostamento o ridimensionamento di una barra col trascinamento. */
+  onMove: (result: DropResult) => void;
+};
+
+/** Handler e stato del trascinamento, passati alle celle. */
+type DragApi = {
+  drag: DragState | null;
+  cellWidth: number;
+  rowHeight: number;
+  onPointerDown: (e: React.PointerEvent<HTMLDivElement>, booking: Booking) => void;
+  onPointerMove: (e: React.PointerEvent<HTMLDivElement>) => void;
+  onPointerUp: (e: React.PointerEvent<HTMLDivElement>) => void;
+  onPointerCancel: () => void;
 };
 
 function renderLodgeCells(
@@ -97,7 +110,8 @@ function renderLodgeCells(
   monthDays: Date[],
   today: Date,
   onCreate: (lodge: Lodge, day: Date) => void,
-  onEdit: (booking: Booking) => void
+  conflictIds: Set<string>,
+  dragApi: DragApi
 ) {
   // Nella corsia "Da assegnare" non esiste un'unità su cui creare: celle non cliccabili.
   const canCreate = lodge !== UNASSIGNED_LODGE;
@@ -133,18 +147,32 @@ function renderLodgeCells(
       const isWeekend =
         getDay(monthDays[i]) === 0 || getDay(monthDays[i]) === 6;
 
+      const { drag, cellWidth, rowHeight } = dragApi;
+      const dragging = drag?.bookingId === booking.id && drag.active;
+      const moving = dragging && drag.mode === "move";
+      const resizing = dragging && drag.mode === "resize";
+
       cells.push(
         <div
           key={i}
-          className={`gantt-cell gantt-cell-booked ${isToday ? "gantt-cell-today" : ""} ${isWeekend ? "gantt-cell-weekend" : ""}`}
+          className={`gantt-cell gantt-cell-booked booking-chip ${isToday ? "gantt-cell-today" : ""} ${isWeekend ? "gantt-cell-weekend" : ""} ${conflictIds.has(booking.id) ? "chip-overbooking" : ""} ${dragging ? "chip-dragging" : ""}`}
           style={{
             gridColumn: `span ${span}`,
             background: bc.bg,
             color: bc.text,
             borderLeft: `3px solid ${bc.text}`,
+            // L'anteprima segue la griglia: si vede subito su quale giorno e
+            // quale camera finirà la prenotazione se si lascia adesso.
+            transform: moving
+              ? `translate(${drag.dayDelta * cellWidth}px, ${drag.rowDelta * rowHeight}px)`
+              : undefined,
+            width: resizing ? `calc(100% + ${drag.dayDelta * cellWidth}px)` : undefined,
           }}
-          onClick={() => onEdit(booking)}
-          title={`${booking.guestName}\n${booking.checkIn} → ${booking.checkOut}\n${booking.totalAmount}€`}
+          onPointerDown={(e) => dragApi.onPointerDown(e, booking)}
+          onPointerMove={dragApi.onPointerMove}
+          onPointerUp={dragApi.onPointerUp}
+          onPointerCancel={dragApi.onPointerCancel}
+          title={`${booking.guestName}\n${booking.checkIn} → ${booking.checkOut}\n${booking.totalAmount}€\nTrascina per spostare, bordo destro per allungare`}
         >
           <span className="gantt-cell-name">{truncName}</span>
           {span > 2 && <span className="gantt-cell-nights">{nights}n</span>}
@@ -152,6 +180,7 @@ function renderLodgeCells(
             <span className="gantt-cell-amount">{booking.totalAmount}€</span>
           )}
           {booking.isNew && <span className="gantt-new-dot" />}
+          <span className="chip-resize-handle" aria-hidden />
         </div>
       );
       i += span;
@@ -168,12 +197,56 @@ export function GanttBoard({
   filters,
   onCreate,
   onEdit,
+  onMove,
 }: GanttBoardProps) {
   const today = useMemo(() => startOfDay(new Date()), []);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [metrics, setMetrics] = useState({ cellWidth: 0, rowHeight: 0 });
+
+  /**
+   * Le colonne sono in `1fr`: la loro larghezza reale dipende dallo schermo e
+   * cambia a ogni rotazione del telefono. Va misurata, non calcolata.
+   */
+  useEffect(() => {
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+
+    function measure() {
+      const cell = wrap?.querySelector(".gantt-day-header");
+      const row = wrap?.querySelector(".gantt-row");
+      setMetrics({
+        cellWidth: cell?.getBoundingClientRect().width ?? 0,
+        rowHeight: row?.getBoundingClientRect().height ?? 0,
+      });
+    }
+
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(wrap);
+    return () => observer.disconnect();
+  }, []);
+  const roomIds = useActiveRoomIds();
+  const roomLabel = useRoomLabel();
+  const roomColor = useRoomColor();
+
+  /**
+   * Le sovrapposizioni si calcolano su TUTTE le prenotazioni, non su quelle
+   * filtrate: un conflitto nascosto da un filtro resterebbe invisibile proprio
+   * mentre serve vederlo.
+   */
+  const conflictIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const { a, b } of detectOverbookings(bookings)) {
+      ids.add(a.id);
+      ids.add(b.id);
+    }
+    return ids;
+  }, [bookings]);
 
   const visibleBookings = useMemo(
     () =>
       bookings.filter((b) => {
+        if (b.deletedAt) return false;
         if (filters.search.trim()) {
           if (
             !b.guestName.toLowerCase().includes(filters.search.trim().toLowerCase())
@@ -189,8 +262,23 @@ export function GanttBoard({
     [bookings, filters]
   );
 
+  const dragApiBase = useBookingDrag({
+    cellWidth: metrics.cellWidth,
+    rowHeight: metrics.rowHeight,
+    roomIds,
+    onDrop: onMove,
+    onClick: onEdit,
+  });
+
+  const dragApi: DragApi = {
+    ...dragApiBase,
+    cellWidth: metrics.cellWidth,
+    rowHeight: metrics.rowHeight,
+  };
+
   const daysCount = monthDays.length;
-  const gridCols = `180px repeat(${daysCount}, minmax(32px, 1fr))`;
+  // Colonna nomi più stretta su telefono: lascia respiro ai giorni.
+  const gridCols = `clamp(112px, 26vw, 180px) repeat(${daysCount}, minmax(34px, 1fr))`;
 
   /**
    * Le prenotazioni non assegnate si sovrappongono spesso sulle stesse date: in una
@@ -214,7 +302,7 @@ export function GanttBoard({
   }, [visibleBookings]);
 
   return (
-    <div className="gantt-wrap" style={{ overflowX: "auto" }}>
+    <div className="gantt-wrap" ref={wrapRef} style={{ overflowX: "auto" }}>
       <div
         className="gantt-header"
         style={{
@@ -224,7 +312,7 @@ export function GanttBoard({
           borderBottom: "1px solid var(--border-strong, #e5e7eb)",
         }}
       >
-        <div className="gantt-label-col">Lodge</div>
+        <div className="gantt-label-col">Camera</div>
         {monthDays.map((day, i) => {
           const isToday = isSameDay(day, today);
           const isWeekend = getDay(day) === 0 || getDay(day) === 6;
@@ -234,13 +322,13 @@ export function GanttBoard({
               className={`gantt-day-header ${isToday ? "gantt-today-header" : ""} ${isWeekend ? "gantt-weekend-header" : ""}`}
             >
               <span className="gantt-day-num">{format(day, "d")}</span>
-              <span className="gantt-day-name">{format(day, "EEE")}</span>
+              <span className="gantt-day-name">{format(day, "EEE", { locale: it })}</span>
             </div>
           );
         })}
       </div>
 
-      {LODGES.map((lodge) => {
+      {roomIds.map((lodge) => {
         const cellMap = buildCellMap(lodge, visibleBookings, monthDays);
         return (
           <div
@@ -254,20 +342,10 @@ export function GanttBoard({
             }}
           >
             <div className="gantt-lodge-label">
-              <span
-                className="gantt-dot"
-                style={{ background: LODGE_COLORS[lodge].dot }}
-              />
-              {lodge}
+              <span className="gantt-dot" style={{ background: roomColor(lodge) }} />
+              {roomLabel(lodge)}
             </div>
-            {renderLodgeCells(
-              lodge,
-              cellMap,
-              monthDays,
-              today,
-              onCreate,
-              onEdit
-            )}
+            {renderLodgeCells(lodge, cellMap, monthDays, today, onCreate, conflictIds, dragApi)}
           </div>
         );
       })}
@@ -286,7 +364,7 @@ export function GanttBoard({
           }}
         >
           <div className="gantt-lodge-label">
-            <span className="gantt-dot" style={{ background: LODGE_COLORS[UNASSIGNED_LODGE].dot }} />
+            <span className="gantt-dot" style={{ background: UNASSIGNED_DOT }} />
             {trackIndex === 0 ? UNASSIGNED_LODGE : ""}
           </div>
           {renderLodgeCells(
@@ -295,7 +373,8 @@ export function GanttBoard({
             monthDays,
             today,
             onCreate,
-            onEdit
+            conflictIds,
+            dragApi
           )}
         </div>
       ))}

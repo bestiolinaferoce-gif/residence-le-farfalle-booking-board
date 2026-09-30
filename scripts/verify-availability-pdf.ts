@@ -3,6 +3,7 @@
  * con e senza parametri dell'imposta di soggiorno.
  *   npx tsx scripts/verify-availability-pdf.ts
  */
+import { defaultRooms } from "@/lib/rooms";
 import { writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -13,7 +14,7 @@ import type { Booking } from "@/lib/types";
 const OUT = tmpdir();
 
 async function main() {
-const res = await fetch("https://residence-le-farfalle-booking-board.vercel.app/api/bookings");
+const res = await fetch("http://localhost:3000/api/bookings");
 const { data } = (await res.json()) as { data: Booking[] };
 console.log(`Prenotazioni da produzione: ${data.length}`);
 console.log(`PDF scritti in ${OUT}`);
@@ -22,7 +23,7 @@ const from = "2026-08-01";
 const to = "2026-08-31";
 
 // Variante 1 — parametri assenti: nessun importo deve comparire.
-const senza = buildAvailabilityPdf({ bookings: data, from, to, taxSettings: EMPTY_TOURIST_TAX_SETTINGS });
+const senza = buildAvailabilityPdf({ bookings: data, from, to, taxSettings: EMPTY_TOURIST_TAX_SETTINGS, propertyName: "Residence Le Farfalle", rooms: defaultRooms().filter((r) => r.active).map((r) => ({ id: r.id, name: r.name })) });
 writeFileSync(join(OUT, "pdf-senza-tassa.pdf"), Buffer.from(senza.output("arraybuffer")));
 
 // Variante 2 — parametri di esempio SOLO per il test, mai scritti nell'app.
@@ -34,7 +35,7 @@ const finti: TouristTaxSettings = {
   seasonEnd: "10-31",
   exemptionNotes: "Disabili e accompagnatori",
 };
-const con = buildAvailabilityPdf({ bookings: data, from, to, taxSettings: finti });
+const con = buildAvailabilityPdf({ bookings: data, from, to, taxSettings: finti, propertyName: "Residence Le Farfalle", rooms: defaultRooms().filter((r) => r.active).map((r) => ({ id: r.id, name: r.name })) });
 writeFileSync(join(OUT, "pdf-con-tassa.pdf"), Buffer.from(con.output("arraybuffer")));
 
 console.log(`Nome file generato: ${availabilityPdfFilename(from, to)}`);

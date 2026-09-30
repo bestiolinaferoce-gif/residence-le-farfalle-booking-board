@@ -22,7 +22,6 @@ loadDotEnv(envPath);
 const baseUrl = (process.env.CHANNEL_SYNC_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || "http://127.0.0.1:3005").replace(/\/$/, "");
 const internalToken =
   process.env.API_WRITE_SECRET ||
-  process.env.NEXT_PUBLIC_API_WRITE_SECRET ||
   process.env.CRON_SECRET ||
   "";
 

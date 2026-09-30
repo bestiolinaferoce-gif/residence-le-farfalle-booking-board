@@ -5,6 +5,7 @@ import { addDays, endOfMonth, format, startOfMonth } from "date-fns";
 import { Download, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { availabilityPdfFilename, buildAvailabilityPdf } from "@/lib/availabilityPdf";
+import { useSettingsStore } from "@/lib/settingsStore";
 import {
   isTouristTaxConfigured,
   type TouristTaxSettings,
@@ -32,6 +33,7 @@ export function AvailabilityPdfDialog({
   taxSettings,
   onSaveTaxSettings,
 }: AvailabilityPdfDialogProps) {
+  const settings = useSettingsStore((s) => s.settings);
   const [period, setPeriod] = useState<Period>("month");
   const [customFrom, setCustomFrom] = useState(iso(new Date()));
   const [customTo, setCustomTo] = useState(iso(addDays(new Date(), 14)));
@@ -64,7 +66,14 @@ export function AvailabilityPdfDialog({
   function download() {
     if (!rangeValid) return;
     onSaveTaxSettings(tax);
-    const doc = buildAvailabilityPdf({ bookings, from: range.from, to: range.to, taxSettings: tax });
+    const doc = buildAvailabilityPdf({
+      bookings,
+      from: range.from,
+      to: range.to,
+      taxSettings: tax,
+      propertyName: settings.property.name,
+      rooms: settings.rooms.filter((room) => room.active).map((room) => ({ id: room.id, name: room.name })),
+    });
     doc.save(availabilityPdfFilename(range.from, range.to));
     onClose();
   }

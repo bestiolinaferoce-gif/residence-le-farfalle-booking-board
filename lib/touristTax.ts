@@ -11,7 +11,11 @@ import type { Booking } from "@/lib/types";
 export type TouristTaxSettings = {
   /** Importo per persona per notte, in euro. */
   amountPerPersonPerNight: number | null;
-  /** Numero massimo di notti tassabili per soggiorno. */
+  /**
+   * Notti massime tassabili per soggiorno. `null` significa "nessun tetto":
+   * molte delibere comunali non ne prevedono uno, e pretendere comunque un
+   * numero costringeva a inventarlo per far funzionare il calcolo.
+   */
   maxTaxableNights: number | null;
   /** Età sotto la quale non si paga. null = nessuna esenzione per età. */
   exemptUnderAge: number | null;
@@ -31,13 +35,9 @@ export const EMPTY_TOURIST_TAX_SETTINGS: TouristTaxSettings = {
   exemptionNotes: "",
 };
 
+/** Basta l'importo: il tetto di notti è facoltativo. */
 export function isTouristTaxConfigured(settings: TouristTaxSettings): boolean {
-  return (
-    typeof settings.amountPerPersonPerNight === "number" &&
-    settings.amountPerPersonPerNight >= 0 &&
-    typeof settings.maxTaxableNights === "number" &&
-    settings.maxTaxableNights >= 0
-  );
+  return typeof settings.amountPerPersonPerNight === "number" && settings.amountPerPersonPerNight >= 0;
 }
 
 export type TouristTaxResult =
@@ -85,10 +85,11 @@ export function computeTouristTax(booking: Booking, settings: TouristTaxSettings
   // Senza soglia di esenzione configurata, i bambini pagano come gli adulti.
   const payingPeople = settings.exemptUnderAge === null ? adults + children : adults;
 
-  const taxableNights = Math.min(
-    nights(booking.checkIn, booking.checkOut),
-    settings.maxTaxableNights as number
-  );
+  const stayNights = nights(booking.checkIn, booking.checkOut);
+  const taxableNights =
+    typeof settings.maxTaxableNights === "number"
+      ? Math.min(stayNights, settings.maxTaxableNights)
+      : stayNights;
 
   return {
     status: "ok",
